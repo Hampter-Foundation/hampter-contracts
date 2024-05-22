@@ -18,6 +18,7 @@
     "typescript": "^5.4.5"
   },
   "dependencies": {
-    "@openzeppelin/contracts": "^5.0.2"
+    "@openzeppelin/contracts": "^5.0.2",
+    "solmate": "^6.2.0"
   }
 }

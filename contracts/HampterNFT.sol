@@ -28,13 +28,15 @@ contract HampterNFT is Ownable, ERC721A, ReentrancyGuard {
     uint256 collectionSize_,
     uint256 amountForDevs_
   ) ERC721A("Hampter NFT", "HAMPTER") Ownable(msg.sender){
-    collectionSize = collectionSize_;
-    maxPerAddressDuringMint = maxBatchSize_;
-    amountForDevs = amountForDevs_;
+    require(maxBatchSize_ > 0, "maxBatchSize must be greater than zero");
     require(
       amountForDevs <= collectionSize_,
       "larger collection size needed"
     );
+    
+    collectionSize = collectionSize_;
+    maxPerAddressDuringMint = maxBatchSize_;
+    amountForDevs = amountForDevs_;
   }
 
   modifier callerIsUser() {
@@ -91,7 +93,7 @@ contract HampterNFT is Ownable, ERC721A, ReentrancyGuard {
   }
 
 
-  function SetSaleInfo(
+  function setSaleInfo(
  uint32 publicSaleStartTime,
     uint64 mintlistPriceWei,
     uint64 publicPriceWei

@@ -33,10 +33,22 @@ describe("HampterNFT", function () {
     });
   });
 
-  describe("Minting", function () {
+  describe("Dev Minting", function () {
     it("Should allow owner to mint for devs", async function () {
-      await hampterNFT.devMint(500);
-      expect(await hampterNFT.totalSupply()).to.equal(500);
+      await hampterNFT.devMint(10);
+      expect(await hampterNFT.balanceOf(owner.address)).to.equal(10);
+    });
+
+    it("Should fail if trying to mint more than allowed for devs", async function () {
+      await expect(hampterNFT.devMint(11)).to.be.revertedWith(
+        "too many already minted before dev mint"
+      );
+    });
+
+    it("Should fail if quantity is not a multiple of maxBatchSize", async function () {
+      await expect(hampterNFT.devMint(7)).to.be.revertedWith(
+        "can only mint a multiple of the maxBatchSize"
+      );
     });
 
     it("Should fail if non-owner tries to mint for devs", async function () {
@@ -44,25 +56,45 @@ describe("HampterNFT", function () {
         "Ownable: caller is not the owner"
       );
     });
+  });
 
-    it("Should allow public sale minting", async function () {
-      await hampterNFT.setPublicSaleKey(1234);
-      await hampterNFT.endAuctionAndSetupNonAuctionSaleInfo(
-        ethers.parseEther("0.08"),
+  describe("Allowlist Minting", function () {
+    beforeEach(async function () {
+      await hampterNFT.seedAllowlist([addr1.address], [1]);
+      await hampterNFT.setSaleInfo(
         ethers.parseEther("0.1"),
+        ethers.parseEther("0.2"),
         Math.floor(Date.now() / 1000) - 1000
       );
+    });
 
-      await hampterNFT.publicSaleMint(2, 1234, {
-        value: ethers.parseEther("0.2"),
-      });
-      expect(await hampterNFT.totalSupply()).to.equal(2);
+    it("Should allow allowlist minting", async function () {
+      await hampterNFT
+        .connect(addr1)
+        .allowlistMint({ value: ethers.parseEther("0.1") });
+      expect(await hampterNFT.balanceOf(addr1.address)).to.equal(1);
+    });
+
+    it("Should fail if not enough ETH sent", async function () {
+      await expect(
+        hampterNFT
+          .connect(addr1)
+          .allowlistMint({ value: ethers.parseEther("0.05") })
+      ).to.be.revertedWith("Need to send more ETH.");
+    });
+
+    it("Should fail if address is not on allowlist", async function () {
+      await expect(
+        hampterNFT
+          .connect(addr2)
+          .allowlistMint({ value: ethers.parseEther("0.1") })
+      ).to.be.revertedWith("not eligible for allowlist mint");
     });
   });
 
   describe("Public Sale Minting", function () {
     beforeEach(async function () {
-      await hampterNFT.SetSaleInfo(
+      await hampterNFT.setSaleInfo(
         ethers.parseEther("0.1"),
         ethers.parseEther("0.2"),
         Math.floor(Date.now() / 1000) - 1000
@@ -85,7 +117,7 @@ describe("HampterNFT", function () {
     });
 
     it("Should fail if public sale has not started", async function () {
-      await hampterNFT.SetSaleInfo(
+      await hampterNFT.setSaleInfo(
         ethers.parseEther("0.1"),
         ethers.parseEther("0.2"),
         Math.floor(Date.now() / 1000) + 1000
@@ -93,7 +125,7 @@ describe("HampterNFT", function () {
       await expect(
         hampterNFT
           .connect(addr1)
-          .publicSaleMint(1, { value: ethers.utils.parseEther("0.2") })
+          .publicSaleMint(1, { value: ethers.parseEther("0.2") })
       ).to.be.revertedWith("public sale has not begun yet");
     });
   });
@@ -101,7 +133,7 @@ describe("HampterNFT", function () {
   describe("Allowlist", function () {
     it("Should allow allowlist minting", async function () {
       await hampterNFT.seedAllowlist([addr1.address], [1]);
-      await hampterNFT.SetSaleInfo(
+      await hampterNFT.setSaleInfo(
         Math.floor(Date.now() / 1000) - 1000,
         ethers.parseEther("0.08"),
         ethers.parseEther("0.1")
@@ -116,7 +148,7 @@ describe("HampterNFT", function () {
 
     it("Should fail to mint from allowlist if not on the list", async function () {
       await hampterNFT.seedAllowlist([addr1.address], [1]);
-      await hampterNFT.SetSaleInfo(
+      await hampterNFT.setSaleInfo(
         Math.floor(Date.now() / 1000) - 1000,
         ethers.parseEther("0.08"),
         ethers.parseEther("0.1")

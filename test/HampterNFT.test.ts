@@ -27,13 +27,20 @@ describe("HampterNFT", function () {
       expect(await hampterNFT.owner()).to.equal(owner.address);
     });
 
-    it("Should set the correct collection size and max batch size", async function () {
+    it("Should initialize collectionSize, maxBatchSize, and amountForDevs correctly", async function () {
       expect(await hampterNFT.collectionSize()).to.equal(100000);
       expect(await hampterNFT.maxPerAddressDuringMint()).to.equal(5);
+      expect(await hampterNFT.amountForDevs()).to.equal(500);
     });
   });
 
   describe("Dev Minting", function () {
+    it("Should fail if trying to mint zero quantity", async function () {
+      await expect(hampterNFT.devMint(0)).to.be.revertedWith(
+        "Quantity must be greater than zero"
+      );
+    });
+
     it("Should allow owner to mint for devs", async function () {
       await hampterNFT.devMint(10);
       expect(await hampterNFT.balanceOf(owner.address)).to.equal(10);
@@ -95,9 +102,9 @@ describe("HampterNFT", function () {
   describe("Public Sale Minting", function () {
     beforeEach(async function () {
       await hampterNFT.setSaleInfo(
+        Math.floor(Date.now() / 1000) - 1000,
         ethers.parseEther("0.1"),
-        ethers.parseEther("0.2"),
-        Math.floor(Date.now() / 1000) - 1000
+        ethers.parseEther("0.2")
       );
     });
 
@@ -118,9 +125,9 @@ describe("HampterNFT", function () {
 
     it("Should fail if public sale has not started", async function () {
       await hampterNFT.setSaleInfo(
+        Math.floor(Date.now() / 1000) + 1000,
         ethers.parseEther("0.1"),
-        ethers.parseEther("0.2"),
-        Math.floor(Date.now() / 1000) + 1000
+        ethers.parseEther("0.2")
       );
       await expect(
         hampterNFT
@@ -161,4 +168,6 @@ describe("HampterNFT", function () {
       ).to.be.revertedWith("not eligible for allowlist mint");
     });
   });
+
+  describe("Ownership", function () {});
 });

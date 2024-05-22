@@ -30,6 +30,10 @@ contract HampterNFT is Ownable, ERC721A, ReentrancyGuard {
   ) ERC721A("Hampter NFT", "HAMPTER") Ownable(msg.sender){
     require(maxBatchSize_ > 0, "maxBatchSize must be greater than zero");
     require(
+      collectionSize_ > 0,
+      "collection size must be greater than zero"
+    );
+    require(
       amountForDevs <= collectionSize_,
       "larger collection size needed"
     );

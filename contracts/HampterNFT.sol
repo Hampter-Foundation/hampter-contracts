@@ -11,7 +11,6 @@ contract HampterNFT is Ownable, ERC721A, ReentrancyGuard {
   uint256 public immutable maxPerAddressDuringMint;
   uint256 public immutable amountForDevs;
   uint256 public immutable collectionSize;
-  uint256 public immutable maxBatchSize;
 
   struct SaleConfig {
     uint32 publicSaleStartTime;
@@ -74,7 +73,7 @@ contract HampterNFT is Ownable, ERC721A, ReentrancyGuard {
     require(totalSupply() + quantity <= collectionSize, "reached max supply");
     require(
       numberMinted(msg.sender) + quantity <= maxPerAddressDuringMint,
-      "can not mint this many"
+      "cannot mint more than maxBatchSize"
     );
     _safeMint(msg.sender, quantity);
     refundIfOver(publicPrice * quantity);
@@ -131,12 +130,12 @@ contract HampterNFT is Ownable, ERC721A, ReentrancyGuard {
       "too many already minted before dev mint"
     );
     require(
-      quantity % maxBatchSize == 0,
+      quantity % maxPerAddressDuringMint == 0,
       "can only mint a multiple of the maxBatchSize"
     );
-    uint256 numChunks = quantity / maxBatchSize;
+    uint256 numChunks = quantity / maxPerAddressDuringMint;
     for (uint256 i = 0; i < numChunks; i++) {
-      _safeMint(msg.sender, maxBatchSize);
+      _safeMint(msg.sender, maxPerAddressDuringMint);
     }
   }
 

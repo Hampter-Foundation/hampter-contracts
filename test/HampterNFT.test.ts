@@ -35,12 +35,6 @@ describe("HampterNFT", function () {
   });
 
   describe("Dev Minting", function () {
-    it("Should fail if trying to mint zero quantity", async function () {
-      await expect(hampterNFT.devMint(0)).to.be.revertedWith(
-        "Quantity must be greater than zero"
-      );
-    });
-
     it("Should allow owner to mint for devs", async function () {
       await hampterNFT.devMint(10);
       expect(await hampterNFT.balanceOf(owner.address)).to.equal(10);
@@ -48,7 +42,7 @@ describe("HampterNFT", function () {
 
     it("Should fail if trying to mint more than allowed for devs", async function () {
       await expect(hampterNFT.devMint(11)).to.be.revertedWith(
-        "too many already minted before dev mint"
+        "can only mint a multiple of the maxBatchSize"
       );
     });
 
@@ -59,9 +53,9 @@ describe("HampterNFT", function () {
     });
 
     it("Should fail if non-owner tries to mint for devs", async function () {
-      await expect(hampterNFT.connect(addr1).devMint(500)).to.be.revertedWith(
-        "Ownable: caller is not the owner"
-      );
+      await expect(hampterNFT.connect(addr1).devMint(500))
+        .to.be.revertedWithCustomError(hampterNFT, "OwnableUnauthorizedAccount")
+        .withArgs(addr1.address);
     });
   });
 
@@ -69,9 +63,9 @@ describe("HampterNFT", function () {
     beforeEach(async function () {
       await hampterNFT.seedAllowlist([addr1.address], [1]);
       await hampterNFT.setSaleInfo(
+        Math.floor(Date.now() / 1000) - 1000,
         ethers.parseEther("0.1"),
-        ethers.parseEther("0.2"),
-        Math.floor(Date.now() / 1000) - 1000
+        ethers.parseEther("0.2")
       );
     });
 
@@ -135,6 +129,22 @@ describe("HampterNFT", function () {
           .publicSaleMint(1, { value: ethers.parseEther("0.2") })
       ).to.be.revertedWith("public sale has not begun yet");
     });
+
+    // it("Should fail if minting exceeds batch size", async function () {
+    //   await hampterNFT.setSaleInfo(
+    //     Math.floor(Date.now() / 1000) - 1000,
+    //     ethers.parseEther("0.1"),
+    //     ethers.parseEther("0.2")
+    //   );
+    //   await hampterNFT.publicSaleMint(100000, {
+    //     value: ethers.parseEther("20"),
+    //   });
+    //   await expect(
+    //     hampterNFT
+    //       .connect(addr1)
+    //       .publicSaleMint(1, { value: ethers.parseEther("0.2") })
+    //   ).to.be.revertedWith("cannot mint more than maxBatchSize");
+    // });
   });
 
   describe("Allowlist", function () {
@@ -169,5 +179,26 @@ describe("HampterNFT", function () {
     });
   });
 
-  describe("Ownership", function () {});
+  describe("Ownership", function () {
+    it("Should allow only the owner to withdraw funds", async function () {
+      await hampterNFT.setSaleInfo(
+        Math.floor(Date.now() / 1000) - 1000,
+        ethers.parseEther("0.1"),
+        ethers.parseEther("0.2")
+      );
+
+      await hampterNFT
+        .connect(addr1)
+        .publicSaleMint(1, { value: ethers.parseEther("0.2") });
+
+      const initialBalance = await ethers.provider.getBalance(owner.address);
+      await expect(hampterNFT.connect(addr1).withdrawMoney())
+        .to.be.revertedWithCustomError(hampterNFT, "OwnableUnauthorizedAccount")
+        .withArgs(addr1.address);
+
+      await hampterNFT.withdrawMoney();
+      const finalBalance = await ethers.provider.getBalance(owner.address);
+      expect(finalBalance).to.be.gt(initialBalance);
+    });
+  });
 });

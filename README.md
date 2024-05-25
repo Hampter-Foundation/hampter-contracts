@@ -1,8 +1,6 @@
-Your test suite for the `HampterNFT` contract is already quite comprehensive, covering deployment, dev minting, allowlist minting, and public sale minting. However, there are a few additional tests you might consider to ensure full coverage of the contract's functionality, including edge cases and security checks.
-
-Here are some suggestions for additional tests:
-
-### Deployment
+# Contracts 
+- Token, NFT, Auction
+### NFT tests
 
 1. **Check Initialization of Variables**:
    Ensure that all important variables are correctly initialized.

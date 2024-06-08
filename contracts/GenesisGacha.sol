@@ -7,6 +7,7 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 /// @title Genesis Gacha Ticket Contract
 /// @notice This contract allows users to mint and burn Genesis Gacha Tickets.
 /// @dev Inherits ERC721A for efficient batch minting and Ownable for access control.
+/// Genesis Gacha Ticket would be burned later on in the PlayHampter Game.
 contract GenesisGacha is ERC721A, Ownable {
 
     /// @notice Constructor to initialize the Genesis Gacha Ticket contract.
@@ -15,8 +16,7 @@ contract GenesisGacha is ERC721A, Ownable {
     /// @notice Mint new Genesis Gacha Tickets.
     /// @dev Mints `quantity` tickets to the caller's address.
     /// @param quantity The number of tickets to mint.
-    /// @return The ID of the first minted ticket.
-    function mint(uint256 quantity) public onlyOwner returns (uint256) {
+    function mint(uint256 quantity) public onlyOwner   {
         require(quantity > 0, "Quantity must be greater than 0");
         _mint(msg.sender, quantity);
     }

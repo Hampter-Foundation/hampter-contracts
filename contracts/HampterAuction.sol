@@ -175,5 +175,6 @@ contract HampterAuction is Ownable, ReentrancyGuard {
 
 // TODO: 
 // 1. Tests
-// 2. Fuzzing 
-// 3. Static Analysis
+// 2. Test Deployment on testnet
+// 3. Fuzzing 
+// 4. Static Analysis

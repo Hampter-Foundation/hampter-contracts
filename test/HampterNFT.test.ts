@@ -119,7 +119,7 @@ describe("HampterNFT", function () {
 
     it("Should fail if public sale has not started", async function () {
       await hampterNFT.setSaleInfo(
-        Math.floor(Date.now() / 1000) + 1000,
+        Math.floor(Date.now() / 1000) + 10000,
         ethers.parseEther("0.1"),
         ethers.parseEther("0.2")
       );

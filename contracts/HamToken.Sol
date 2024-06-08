@@ -735,3 +735,9 @@ contract HamToken is ERC20, Ownable, ERC20Burnable {
         excludeFromMaxTransaction(_addr, isAuthorized);
     }
 }
+
+// TODO: 
+// 1. Code Complete
+// 2. Tests
+// 2. Fuzzing 
+// 3. Static Analysis

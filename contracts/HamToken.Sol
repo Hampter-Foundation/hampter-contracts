@@ -243,7 +243,7 @@ contract HamToken is ERC20, Ownable, ERC20Burnable {
 
     /******************/
 
-    // exclude from fees and max transaction amount
+    // exclude addresses from fees and max transaction amount
     mapping(address => bool) private _isExcludedFromFees;
     mapping(address => bool) public _isExcludedMaxTransactionAmount;
 

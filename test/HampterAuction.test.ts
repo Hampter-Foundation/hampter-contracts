@@ -104,13 +104,18 @@ describe("HampterAuction", function () {
 
   describe("endAuction", function () {
     beforeEach(async function () {
-      const startTime = Math.floor(Date.now() / 1000) + 60;
-      const endTime = startTime + 3600;
+      const currentBlock = await ethers.provider.getBlock("latest");
+      const currentTime = currentBlock?.timestamp;
+      const startTime = currentTime + 60; // Start auction after 1 minute
+      const endTime = startTime + 3600; // End auction 1 hour after it starts
+
       const minBid = ethers.parseEther("0.1");
       const minBidIncrement = ethers.parseEther("0.01");
 
       await auction.startAuction(startTime, endTime, minBid, minBidIncrement);
-      await ethers.provider.send("evm_setNextBlockTimestamp", [endTime + 1]);
+
+      // Fast forward the blockchain time to after the auction end time
+      await ethers.provider.send("evm_setNextBlockTimestamp", [endTime + 1000]);
       await ethers.provider.send("evm_mine", []);
     });
 
@@ -122,19 +127,17 @@ describe("HampterAuction", function () {
     });
 
     it("Should revert if the Auction has already ended", async function () {
+      // end the auction once
+      await auction.endAuction();
       await expect(auction.endAuction()).to.be.revertedWith(
-        "Auction has already ended"
+        "Auction is not ongoing"
       );
     });
 
-    it("Should revert if the auction has already ended", async function () {
+    it("Should revert if a bid is placed after the auction has ended", async function () {
       const bidAmount = ethers.parseEther("0.2");
-      const startTime = Math.floor(Date.now() / 1000) + 60;
-      const endTime = startTime + 3600;
 
-      // Advance the block timestamp past the end time
-      await ethers.provider.send("evm_setNextBlockTimestamp", [endTime + 1]);
-      await ethers.provider.send("evm_mine", []);
+      // No need to set the next block timestamp again, as it was already set in the beforeEach hook
 
       await expect(
         auction.connect(bidder1).placeBid({ value: bidAmount })

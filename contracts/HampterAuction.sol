@@ -103,6 +103,10 @@ contract HampterAuction is Ownable, ReentrancyGuard {
     emit AuctionEnded();
   }
 
+  function resetAuction() external onlyOwner {
+    auction = Auction(0, 0, 0, 0, AuctionState.NotStarted);
+  }
+
   /// @dev Sets the winners of the auction 
   function setWinners(uint256[] memory _winningBidIds) external onlyOwner {
       require(auction.auctionState == AuctionState.Ended, "Auction is not ended");
@@ -160,7 +164,8 @@ contract HampterAuction is Ownable, ReentrancyGuard {
     require(auction.auctionState == AuctionState.WinnersAnnounced, "Winners have not been announced");
     require(validBidIds[bidId], "Invalid bidId");
 
-    Bid memory bid = getBid(bidId);
+    uint256 bidIndex = bidIdToBidsIndex[bidId];
+    Bid storage bid = bids[bidIndex]; // Use storage to get a reference to the actual storage    
     require(bid.bidder == msg.sender, "Only the bidder can claim the refund");
     require(bid.isWinner == false, "Winners cannot claim refund");
     require(bid.isClaimed == false, "Refund has already been claimed");

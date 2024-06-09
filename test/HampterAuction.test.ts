@@ -146,9 +146,16 @@ describe("HampterAuction", function () {
   });
 
   describe("setWinners", function () {
+    let startTime: number;
+    let endTime: number;
+
     beforeEach(async function () {
-      const startTime = Math.floor(Date.now() / 1000) + 60;
-      const endTime = startTime + 3600;
+      const currentBlock = await ethers.provider.getBlock("latest");
+      const currentTime = currentBlock?.timestamp;
+
+      startTime = currentTime + 60; // Start auction after 1 minute
+      endTime = startTime + 3600; // End auction 1 hour after it starts
+
       const minBid = ethers.parseEther("0.1");
       const minBidIncrement = ethers.parseEther("0.01");
 
@@ -157,12 +164,14 @@ describe("HampterAuction", function () {
       const bidAmount1 = ethers.parseEther("0.2");
       const bidAmount2 = ethers.parseEther("0.3");
 
+      // Fast forward to auction start time
       await ethers.provider.send("evm_setNextBlockTimestamp", [startTime]);
       await ethers.provider.send("evm_mine", []);
 
       await auction.connect(bidder1).placeBid({ value: bidAmount1 });
       await auction.connect(bidder2).placeBid({ value: bidAmount2 });
 
+      // Fast forward to after auction end time
       await ethers.provider.send("evm_setNextBlockTimestamp", [endTime + 1]);
       await ethers.provider.send("evm_mine", []);
 
@@ -188,6 +197,7 @@ describe("HampterAuction", function () {
 
     it("Should revert if the auction is not ended", async function () {
       const winningBidIds = [BigInt(0), BigInt(1)];
+      await auction.resetAuction();
 
       await expect(auction.setWinners(winningBidIds)).to.be.revertedWith(
         "Auction is not ended"
@@ -196,11 +206,17 @@ describe("HampterAuction", function () {
   });
 
   describe("claimRefund", function () {
+    let startTime: number;
+    let endTime: number;
     beforeEach(async function () {
-      const startTime = Math.floor(Date.now() / 1000) + 60;
-      const endTime = startTime + 3600;
+      const currentBlock = await ethers.provider.getBlock("latest");
+      const currentTime = currentBlock?.timestamp;
+
+      startTime = currentTime + 60; // Start auction after 1 minute
+      endTime = startTime + 3600; // End auction 1 hour after it starts
       const minBid = ethers.parseEther("0.1");
       const minBidDenomination = ethers.parseEther("0.01");
+
       await auction.startAuction(
         startTime,
         endTime,
@@ -208,13 +224,18 @@ describe("HampterAuction", function () {
         minBidDenomination
       );
 
+      // Fast forward to auction start time
+      await ethers.provider.send("evm_setNextBlockTimestamp", [startTime]);
+      await ethers.provider.send("evm_mine", []);
+
       const bidAmount1 = ethers.parseEther("0.2");
       const bidAmount2 = ethers.parseEther("0.3");
 
       await auction.connect(bidder1).placeBid({ value: bidAmount1 });
       await auction.connect(bidder2).placeBid({ value: bidAmount2 });
 
-      await ethers.provider.send("evm_increaseTime", [3601]);
+      // Fast forward to after auction end time
+      await ethers.provider.send("evm_setNextBlockTimestamp", [endTime + 1]);
       await ethers.provider.send("evm_mine", []);
 
       await auction.endAuction();

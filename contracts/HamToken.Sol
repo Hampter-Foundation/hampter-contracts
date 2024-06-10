@@ -279,7 +279,7 @@ contract HamToken is ERC20, Ownable, ERC20Burnable {
         uint256 tokensIntoLiquidity
     );
 
-    constructor() ERC20("Ham Token", "HAM") {
+    constructor() ERC20("Hampter Token", "HAMP") {
         IUniswapV2Router02 _uniswapV2Router = IUniswapV2Router02(
             0x327Df1E6de05895d2ab08513aaDD9313Fe505d86
         ); //base swap

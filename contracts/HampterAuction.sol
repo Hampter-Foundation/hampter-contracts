@@ -64,6 +64,8 @@ contract HampterAuction is Ownable, ReentrancyGuard {
   */
   event RefundClaimed(address indexed bidder, uint256 amount);
 
+  event FundsWithdrawn(address indexed owner, uint256 amount);
+
   enum AuctionState { NotStarted, Ongoing, Ended, WinnersAnnounced, AirdropCompleted }
 
   // TODO: Perform gas optimization here
@@ -129,7 +131,7 @@ contract HampterAuction is Ownable, ReentrancyGuard {
    * A bidder can place multiple bids as long as the total number of bids does not exceed the maximum bid limit.
    * A bidder cannot update or cancel a bid once it is placed.
    */
-  // TODO: Add denomination of the bid amount
+  // Question: Should bid amount be an input as well?
   function placeBid() external payable {
     require(auction.auctionState == AuctionState.Ongoing, "Auction is not ongoing");
     require(block.timestamp >= auction.startTime, "Auction has not started yet");
@@ -138,7 +140,6 @@ contract HampterAuction is Ownable, ReentrancyGuard {
     require(msg.value >= auction.minBid, "Bid amount must be greater than or equal to the minimum bid amount");
     require(msg.value % auction.bidDenomination == 0, "Bid amount must be a multiple of the bid denomination");
     require(bidCounts[msg.sender] <= maxBidPerAddress, "Bid limit reached");
-
 
     uint256 currentBidId = nextBidId;
     Bid memory newBid = Bid(msg.sender, msg.value, currentBidId, false, false);
@@ -175,6 +176,36 @@ contract HampterAuction is Ownable, ReentrancyGuard {
 
     emit RefundClaimed(msg.sender, bid.amount);
   }
+
+  /// @dev Allows the owner to withdraw the winning funds after the auction has ended 
+    function withdrawWinningFunds() external onlyOwner {
+        require(auction.auctionState == AuctionState.WinnersAnnounced, "Winners have not been announced");
+
+        uint256 winningFunds = 0;
+        for (uint256 i = 0; i < bids.length; i++) {
+            if (bids[i].isWinner && !bids[i].isClaimed) {
+                winningFunds += bids[i].amount;
+                bids[i].isClaimed = true;
+            }
+        }
+
+        require(winningFunds > 0, "No winning funds to withdraw");
+        payable(owner()).transfer(winningFunds);
+        emit FundsWithdrawn(owner(), winningFunds);
+    }
+
+
+    /// @dev Allows the owner to withdraw remaining funds 1 month after the auction has ended
+    function withdrawRemainingFunds() external onlyOwner {
+        require(auction.auctionState == AuctionState.WinnersAnnounced, "Winners have not been announced");
+        require(block.timestamp >= auction.endTime + 30 days, "Remaining funds can only be withdrawn 1 month after the auction has ended");
+
+        uint256 remainingFunds = address(this).balance;
+        require(remainingFunds > 0, "No remaining funds to withdraw");
+
+        payable(owner()).transfer(remainingFunds);
+        emit FundsWithdrawn(owner(), remainingFunds);
+    }
 }
 
 

@@ -8,17 +8,17 @@ import { HampterAuction } from "../typechain-types";
 // TODO: Try to break the code
 
 describe("HampterAuction", function () {
-  let HampterAuction: HampterAuction;
   let auction: HampterAuction;
   let owner: Signer;
   let bidder1: Signer;
   let bidder2: Signer;
+  let multisig: Signer;
 
   beforeEach(async function () {
     const HampterAuctionFactory = await ethers.getContractFactory(
       "HampterAuction"
     );
-    [owner, bidder1, bidder2] = await ethers.getSigners();
+    [owner, bidder1, bidder2, multisig] = await ethers.getSigners();
     auction = await HampterAuctionFactory.deploy();
   });
 
@@ -288,6 +288,180 @@ describe("HampterAuction", function () {
       await expect(
         auction.connect(owner).claimRefund(bidId)
       ).to.be.revertedWith("Only the bidder can claim the refund");
+    });
+  });
+  describe("withdrawWinningFunds", function () {
+    let startTime: number;
+    let endTime: number;
+
+    beforeEach(async function () {
+      const currentBlock = await ethers.provider.getBlock("latest");
+      const currentTime = currentBlock?.timestamp;
+
+      startTime = currentTime + 60; // Start auction after 1 minute
+      endTime = startTime + 3600; // End auction 1 hour after it starts
+
+      const minBid = ethers.parseEther("0.1");
+      const minBidIncrement = ethers.parseEther("0.01");
+
+      await auction.startAuction(startTime, endTime, minBid, minBidIncrement);
+
+      const bidAmount1 = ethers.parseEther("0.2");
+      const bidAmount2 = ethers.parseEther("0.3");
+      const bidAmount3 = ethers.parseEther("0.1");
+
+      // Fast forward to auction start time
+      await ethers.provider.send("evm_setNextBlockTimestamp", [startTime]);
+      await ethers.provider.send("evm_mine", []);
+
+      await auction.connect(bidder1).placeBid({ value: bidAmount1 });
+      await auction.connect(bidder2).placeBid({ value: bidAmount2 });
+      await auction.connect(bidder1).placeBid({ value: bidAmount3 });
+
+      // Fast forward to after auction end time
+      await ethers.provider.send("evm_setNextBlockTimestamp", [endTime + 1]);
+      await ethers.provider.send("evm_mine", []);
+
+      await auction.endAuction();
+    });
+    // Test that the function can only be called by the owner.
+    // Test that the function reverts if the auction state is not WinnersAnnounced.
+    // Test that the function correctly calculates the total winning funds and updates the isClaimed status of winning bids.
+    // Test that the function reverts if there are no winning funds to withdraw.
+    // Test that the function successfully transfers the winning funds to the owner.
+    // Test that the function emits the appropriate event(s) upon successful withdrawal.
+    it("Should allow the owner to withdraw winning funds", async function () {
+      const winningBidIds = [BigInt(0), BigInt(1)];
+      await auction.setWinners(winningBidIds);
+
+      const multisigAddress = await owner.getAddress();
+      const multisigBalanceBefore = await ethers.provider.getBalance(
+        multisigAddress
+      );
+
+      await expect(auction.withdrawWinningFunds())
+        .to.emit(auction, "FundsWithdrawn")
+        .withArgs(multisigAddress, ethers.parseEther("0.5")); // 0.2 + 0.3 = 0.6
+
+      const multisigBalanceAfter = await ethers.provider.getBalance(
+        multisigAddress
+      );
+
+      expect(multisigBalanceAfter - multisigBalanceBefore).to.be.closeTo(
+        ethers.parseEther("0.5"),
+        100000000000000n // accounting for gas fees
+      );
+
+      // expect contract to still have 0.1
+      const contractBalance = await ethers.provider.getBalance(
+        await auction.getAddress()
+      );
+      expect(contractBalance).to.equal(ethers.parseEther("0.1"));
+
+      // expect winning bids to be marked as claimed
+      const bid1 = await auction.getBid(0);
+      expect(bid1.isClaimed).to.be.true;
+      const bid2 = await auction.getBid(1);
+      expect(bid2.isClaimed).to.be.true;
+      const bid3 = await auction.getBid(2);
+      expect(bid3.isClaimed).to.be.false;
+
+      // bidder 1 can claim refund for bid 3
+      await auction.connect(bidder1).claimRefund(BigInt(2));
+      // check bidder 1 balance
+      const bidder1Balance = await ethers.provider.getBalance(
+        await bidder1.getAddress()
+      );
+      expect(bidder1Balance).to.be.gt(ethers.parseEther("0.1"));
+    });
+
+    it("Should revert if called by a non-owner", async function () {
+      const winningBidIds = [BigInt(0), BigInt(1)];
+      await auction.setWinners(winningBidIds);
+
+      await expect(
+        auction.connect(bidder1).withdrawWinningFunds()
+      ).to.be.revertedWithCustomError(auction, "OwnableUnauthorizedAccount");
+    });
+  });
+
+  describe("withdrawRemainingFunds", function () {
+    let startTime: number;
+    let endTime: number;
+
+    beforeEach(async function () {
+      const currentBlock = await ethers.provider.getBlock("latest");
+      const currentTime = currentBlock?.timestamp;
+
+      startTime = currentTime + 60; // Start auction after 1 minute
+      endTime = startTime + 3600; // End auction 1 hour after it starts
+
+      const minBid = ethers.parseEther("0.1");
+      const minBidIncrement = ethers.parseEther("0.01");
+
+      await auction.startAuction(startTime, endTime, minBid, minBidIncrement);
+
+      const bidAmount1 = ethers.parseEther("0.2");
+      const bidAmount2 = ethers.parseEther("0.3");
+
+      // Fast forward to auction start time
+      await ethers.provider.send("evm_setNextBlockTimestamp", [startTime]);
+      await ethers.provider.send("evm_mine", []);
+
+      await auction.connect(bidder1).placeBid({ value: bidAmount1 });
+      await auction.connect(bidder2).placeBid({ value: bidAmount2 });
+
+      // Fast forward to after auction end time
+      await ethers.provider.send("evm_setNextBlockTimestamp", [endTime + 1]);
+      await ethers.provider.send("evm_mine", []);
+
+      await auction.endAuction();
+    });
+
+    it("Should allow the owner to withdraw remaining funds after 1 month", async function () {
+      const winningBidIds = [BigInt(1)];
+      await auction.setWinners(winningBidIds);
+      await auction.withdrawWinningFunds();
+
+      // Fast forward 1 month
+      await ethers.provider.send("evm_increaseTime", [30 * 24 * 60 * 60]);
+      await ethers.provider.send("evm_mine", []);
+
+      const multisigBalanceBefore = await ethers.provider.getBalance(
+        await owner.getAddress()
+      );
+
+      await expect(auction.withdrawRemainingFunds())
+        .to.emit(auction, "FundsWithdrawn")
+        .withArgs(await owner.getAddress(), ethers.parseEther("0.2")); // Remaining funds: 0.2
+
+      const multisigBalanceAfter = await ethers.provider.getBalance(
+        await owner.getAddress()
+      );
+      expect(multisigBalanceAfter - multisigBalanceBefore).to.to.be.closeTo(
+        ethers.parseEther("0.2"),
+        100000000000000n // accounting for gas fees
+      );
+    });
+
+    it("Should revert if called by a non-owner", async function () {
+      const winningBidIds = [BigInt(1)];
+      await auction.setWinners(winningBidIds);
+      await auction.withdrawWinningFunds();
+
+      await expect(
+        auction.connect(bidder1).withdrawWinningFunds()
+      ).to.be.revertedWithCustomError(auction, "OwnableUnauthorizedAccount");
+    });
+
+    it("Should revert if called before 1 month has passed", async function () {
+      const winningBidIds = [BigInt(1)];
+      await auction.setWinners(winningBidIds);
+      await auction.withdrawWinningFunds();
+
+      await expect(auction.withdrawRemainingFunds()).to.be.revertedWith(
+        "Remaining funds can only be withdrawn 1 month after the auction has ended"
+      );
     });
   });
 });

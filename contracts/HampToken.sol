@@ -1,208 +1,18 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.19;
+pragma solidity ^0.8.20;
 
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {ERC20Burnable} from "@openzeppelin/contracts/token/ERC20/extensions/ERC20Burnable.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/extensions/ERC20Permit.sol";
 
-import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
-import {SafeMath} from "@openzeppelin/contracts/utils/math/SafeMath.sol";
-import {SafeTransferLib} from "solmate/utils/SafeTransferLib.sol";
+import {Ownable2Step, Ownable} from "@openzeppelin/contracts/access/Ownable2Step.sol";
+import {SafeTransferLib} from "solmate/src/utils/SafeTransferLib.sol";
+import {IUniswapV2Router02} from "./interfaces/IUniswapV2Router02.sol";
+import {IUniswapV2Factory} from "./interfaces/IUniswapV2Factory.sol";
 
-interface IUniswapV2Factory {
-    event PairCreated(
-        address indexed token0,
-        address indexed token1,
-        address pair,
-        uint256
-    );
-
-    function feeTo() external view returns (address);
-
-    function feeToSetter() external view returns (address);
-
-    function getPair(
-        address tokenA,
-        address tokenB
-    ) external view returns (address pair);
-
-    function allPairs(uint256) external view returns (address pair);
-
-    function allPairsLength() external view returns (uint256);
-
-    function createPair(
-        address tokenA,
-        address tokenB
-    ) external returns (address pair);
-
-    function setFeeTo(address) external;
-
-    function setFeeToSetter(address) external;
-}
-
-////// src/IUniswapV2Pair.sol
-/* pragma solidity 0.8.10; */
-/* pragma experimental ABIEncoderV2; */
-
-interface IUniswapV2Pair {
-    event Approval(
-        address indexed owner,
-        address indexed spender,
-        uint256 value
-    );
-    event Transfer(address indexed from, address indexed to, uint256 value);
-
-    function name() external pure returns (string memory);
-
-    function symbol() external pure returns (string memory);
-
-    function decimals() external pure returns (uint8);
-
-    function totalSupply() external view returns (uint256);
-
-    function balanceOf(address owner) external view returns (uint256);
-
-    function allowance(
-        address owner,
-        address spender
-    ) external view returns (uint256);
-
-    function approve(address spender, uint256 value) external returns (bool);
-
-    function transfer(address to, uint256 value) external returns (bool);
-
-    function transferFrom(
-        address from,
-        address to,
-        uint256 value
-    ) external returns (bool);
-
-    function DOMAIN_SEPARATOR() external view returns (bytes32);
-
-    function PERMIT_TYPEHASH() external pure returns (bytes32);
-
-    function nonces(address owner) external view returns (uint256);
-
-    function permit(
-        address owner,
-        address spender,
-        uint256 value,
-        uint256 deadline,
-        uint8 v,
-        bytes32 r,
-        bytes32 s
-    ) external;
-
-    event Mint(address indexed sender, uint256 amount0, uint256 amount1);
-    event Burn(
-        address indexed sender,
-        uint256 amount0,
-        uint256 amount1,
-        address indexed to
-    );
-    event Swap(
-        address indexed sender,
-        uint256 amount0In,
-        uint256 amount1In,
-        uint256 amount0Out,
-        uint256 amount1Out,
-        address indexed to
-    );
-    event Sync(uint112 reserve0, uint112 reserve1);
-
-    function MINIMUM_LIQUIDITY() external pure returns (uint256);
-
-    function factory() external view returns (address);
-
-    function token0() external view returns (address);
-
-    function token1() external view returns (address);
-
-    function getReserves()
-        external
-        view
-        returns (uint112 reserve0, uint112 reserve1, uint32 blockTimestampLast);
-
-    function price0CumulativeLast() external view returns (uint256);
-
-    function price1CumulativeLast() external view returns (uint256);
-
-    function kLast() external view returns (uint256);
-
-    function mint(address to) external returns (uint256 liquidity);
-
-    function burn(
-        address to
-    ) external returns (uint256 amount0, uint256 amount1);
-
-    function swap(
-        uint256 amount0Out,
-        uint256 amount1Out,
-        address to,
-        bytes calldata data
-    ) external;
-
-    function skim(address to) external;
-
-    function sync() external;
-
-    function initialize(address, address) external;
-}
-
-interface IUniswapV2Router02 {
-    function factory() external pure returns (address);
-
-    function WETH() external pure returns (address);
-
-    function addLiquidity(
-        address tokenA,
-        address tokenB,
-        uint256 amountADesired,
-        uint256 amountBDesired,
-        uint256 amountAMin,
-        uint256 amountBMin,
-        address to,
-        uint256 deadline
-    ) external returns (uint256 amountA, uint256 amountB, uint256 liquidity);
-
-    function addLiquidityETH(
-        address token,
-        uint256 amountTokenDesired,
-        uint256 amountTokenMin,
-        uint256 amountETHMin,
-        address to,
-        uint256 deadline
-    )
-        external
-        payable
-        returns (uint256 amountToken, uint256 amountETH, uint256 liquidity);
-
-    function swapExactTokensForTokensSupportingFeeOnTransferTokens(
-        uint256 amountIn,
-        uint256 amountOutMin,
-        address[] calldata path,
-        address to,
-        uint256 deadline
-    ) external;
-
-    function swapExactETHForTokensSupportingFeeOnTransferTokens(
-        uint256 amountOutMin,
-        address[] calldata path,
-        address to,
-        uint256 deadline
-    ) external payable;
-
-    function swapExactTokensForETHSupportingFeeOnTransferTokens(
-        uint256 amountIn,
-        uint256 amountOutMin,
-        address[] calldata path,
-        address to,
-        uint256 deadline
-    ) external;
-}
-
-contract HamToken is ERC20, Ownable, ERC20Burnable {
-    using SafeMath for uint256;
+// https://www.playhampter.com/
+contract HampToken is ERC20, Ownable, ERC20Burnable, ERC20Permit {
     using SafeTransferLib for address payable;
 
     IUniswapV2Router02 public immutable uniswapV2Router;
@@ -279,23 +89,24 @@ contract HamToken is ERC20, Ownable, ERC20Burnable {
         uint256 tokensIntoLiquidity
     );
 
-    constructor() ERC20("Hampter Token", "HAMP") {
+    constructor() ERC20("Hampter Token", "HAMP") ERC20Permit("Hamp") Ownable(msg.sender) {
         IUniswapV2Router02 _uniswapV2Router = IUniswapV2Router02(
-            0x327Df1E6de05895d2ab08513aaDD9313Fe505d86
-        ); //base swap
+            0x98994a9A7a2570367554589189dC9772241650f6 // thruster router
+        ); 
 
         excludeFromMaxTransaction(address(_uniswapV2Router), true);
         uniswapV2Router = _uniswapV2Router;
 
+        // create pair in advance without LP
         uniswapV2Pair = IUniswapV2Factory(_uniswapV2Router.factory())
             .createPair(address(this), _uniswapV2Router.WETH());
 
         excludeFromMaxTransaction(address(uniswapV2Pair), true);
         _setAutomatedMarketMakerPair(address(uniswapV2Pair), true);
 
-        uint256 _buyRevShareFee = 2;
+        uint256 _buyRevShareFee = 2; // 2% goes to the players of the game as rewards.
         uint256 _buyLiquidityFee = 1;
-        uint256 _buyTeamFee = 2;
+        uint256 _buyTeamFee = 2; // 1% goes to the developers of Hamp
 
         uint256 _sellRevShareFee = 2;
         uint256 _sellLiquidityFee = 1;
@@ -671,12 +482,6 @@ contract HamToken is ERC20, Ownable, ERC20Burnable {
         }
 
         payable(revShareWallet).safeTransferETH(address(this).balance);
-    }
-
-    function withdrawStuckUnibot() external onlyOwner {
-        uint256 balance = IERC20(address(this)).balanceOf(address(this));
-        IERC20(address(this)).transfer(msg.sender, balance);
-        payable(msg.sender).transfer(address(this).balance);
     }
 
     function withdrawStuckToken(

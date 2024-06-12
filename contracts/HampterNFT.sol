@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 
+// https://www.playhampter.com/
 pragma solidity ^0.8.0;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
@@ -10,7 +11,6 @@ import "@openzeppelin/contracts/utils/Strings.sol";
 
 /**
  * @title Hampter NFT
- * @author Limit Break, Inc.
  * @notice Extends Azuki's ERC721-A implementation with ERC721-C Creator Token functionality, which
  *         allows the contract owner to update the transfer validation logic by managing a security policy in
  *         an external transfer validation security policy registry.  See {CreatorTokenTransferValidator}.

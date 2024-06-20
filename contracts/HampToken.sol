@@ -89,7 +89,7 @@ contract HampToken is ERC20, Ownable, ERC20Burnable, ERC20Permit {
         uint256 tokensIntoLiquidity
     );
 
-    constructor() ERC20("Hampter Token", "HAMP") ERC20Permit("Hamp") Ownable(msg.sender) {
+    constructor() ERC20("Hampter Token", "HAMP") ERC20Permit("HAMP") Ownable(msg.sender) {
         IUniswapV2Router02 _uniswapV2Router = IUniswapV2Router02(
             0x98994a9A7a2570367554589189dC9772241650f6 // thruster router
         ); 
@@ -105,18 +105,18 @@ contract HampToken is ERC20, Ownable, ERC20Burnable, ERC20Permit {
         _setAutomatedMarketMakerPair(address(uniswapV2Pair), true);
 
         uint256 _buyRevShareFee = 2; // 2% goes to the players of the game as rewards.
-        uint256 _buyLiquidityFee = 1;
-        uint256 _buyTeamFee = 2; // 1% goes to the developers of Hamp
+        uint256 _buyLiquidityFee = 1; // 1% gets added back as liquidity provision to support the $HAMP economy.
+        uint256 _buyTeamFee = 2; // 1% goes to the developers of Hampter
 
-        uint256 _sellRevShareFee = 2;
-        uint256 _sellLiquidityFee = 1;
-        uint256 _sellTeamFee = 2;
+        uint256 _sellRevShareFee = 2; // 2% goes to the players of the game as rewards.
+        uint256 _sellLiquidityFee = 1; // 1% gets added back as liquidity provision to support the $HAMP economy.
+        uint256 _sellTeamFee = 2; // 1% goes to the developers of Hampter
 
         uint256 totalSupply = 10_000_000 * 1e18;
 
-        maxTransactionAmount = 5_000 * 1e18; // 0.05%
-        maxWallet = 5_000 * 1e18; // 0.05%
-        swapTokensAtAmount = (totalSupply * 5) / 10000; // 0.05%
+        maxTransactionAmount = 5_000 * 1e18; // 0.05% of total supply
+        maxWallet = 5_000 * 1e18; // 0.05% of total supply
+        swapTokensAtAmount = (totalSupply * 5) / 10000; // 0.05% of total supply
 
         buyRevShareFee = _buyRevShareFee;
         buyLiquidityFee = _buyLiquidityFee;
@@ -150,6 +150,7 @@ contract HampToken is ERC20, Ownable, ERC20Burnable, ERC20Permit {
 
     receive() external payable {}
 
+    /// @dev Owner has to enable trading before the token can be traded
     // once enabled, can never be turned off
     function enableTrading() external onlyOwner {
         tradingActive = true;
@@ -163,7 +164,7 @@ contract HampToken is ERC20, Ownable, ERC20Burnable, ERC20Permit {
         return true;
     }
 
-    // change the minimum amount of tokens to sell from fees
+    /// @dev change the minimum amount of tokens to sell from fees
     function updateSwapTokensAtAmount(
         uint256 newAmount
     ) external onlyOwner returns (bool) {
@@ -274,6 +275,7 @@ contract HampToken is ERC20, Ownable, ERC20Burnable, ERC20Permit {
         return blacklisted[account];
     }
 
+    /// @dev Override the transfer function to add the fees
     function _transfer(
         address from,
         address to,
@@ -325,6 +327,7 @@ contract HampToken is ERC20, Ownable, ERC20Burnable, ERC20Permit {
                         "Max wallet exceeded"
                     );
                 }
+                
                 //when sell
                 else if (
                     automatedMarketMakerPairs[to] &&
@@ -374,14 +377,14 @@ contract HampToken is ERC20, Ownable, ERC20Burnable, ERC20Permit {
         if (takeFee) {
             // on sell
             if (automatedMarketMakerPairs[to] && sellTotalFees > 0) {
-                fees = amount.mul(sellTotalFees).div(100);
+                fees = amount * sellTotalFees / 100;
                 tokensForLiquidity += (fees * sellLiquidityFee) / sellTotalFees;
                 tokensForTeam += (fees * sellTeamFee) / sellTotalFees;
                 tokensForRevShare += (fees * sellRevShareFee) / sellTotalFees;
             }
             // on buy
             else if (automatedMarketMakerPairs[from] && buyTotalFees > 0) {
-                fees = amount.mul(buyTotalFees).div(100);
+                fees = amount * buyTotalFees / 100; // NOTE: Is this correct?
                 tokensForLiquidity += (fees * buyLiquidityFee) / buyTotalFees;
                 tokensForTeam += (fees * buyTeamFee) / buyTotalFees;
                 tokensForRevShare += (fees * buyRevShareFee) / buyTotalFees;
@@ -430,6 +433,13 @@ contract HampToken is ERC20, Ownable, ERC20Burnable, ERC20Permit {
         );
     }
 
+    /**
+     * @dev Swaps the tokens collected as fees into ETH and splits them into three parts:
+     * 1. ETH for liquidity for $HAM - 1%
+     * 2. ETH for ecosystem development - 2%
+     * 3. ETH for PVE and PVP rewards - 2%
+     * The Swap happens when the contract accrues more than 500 $HAM tokens.
+     */
     function swapBack() private {
         uint256 contractBalance = balanceOf(address(this));
         uint256 totalTokensToSwap = tokensForLiquidity +
@@ -448,19 +458,19 @@ contract HampToken is ERC20, Ownable, ERC20Burnable, ERC20Permit {
         uint256 liquidityTokens = (contractBalance * tokensForLiquidity) /
             totalTokensToSwap /
             2;
-        uint256 amountToSwapForETH = contractBalance.sub(liquidityTokens);
+        uint256 amountToSwapForETH = contractBalance - liquidityTokens;
 
         uint256 initialETHBalance = address(this).balance;
 
         swapTokensForEth(amountToSwapForETH);
 
-        uint256 ethBalance = address(this).balance.sub(initialETHBalance);
+        uint256 ethBalance = address(this).balance - initialETHBalance;
 
-        uint256 ethForRevShare = ethBalance.mul(tokensForRevShare).div(
+        uint256 ethForRevShare = ethBalance * tokensForRevShare / (
             totalTokensToSwap - (tokensForLiquidity / 2)
         );
 
-        uint256 ethForTeam = ethBalance.mul(tokensForTeam).div(
+        uint256 ethForTeam = ethBalance * tokensForTeam / (
             totalTokensToSwap - (tokensForLiquidity / 2)
         );
 
@@ -513,7 +523,7 @@ contract HampToken is ERC20, Ownable, ERC20Burnable, ERC20Permit {
         blacklisted[_addr] = true;
     }
 
-    // @dev blacklist v3 pools; can unblacklist() down the road to suit project and community
+    /// @dev blacklist v3 pools; can unblacklist() down the road to suit project and community
     function blacklistLiquidityPool(address lpAddress) public onlyOwner {
         require(!blacklistRenounced, "Team has revoked blacklist rights");
         require(

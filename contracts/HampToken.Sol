@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.19;
 
-import {ERC20} from "./lib/openzeppelin-contractsv4.90/contracts/token/ERC20/ERC20.sol";
-import {ERC20Burnable} from "./lib/openzeppelin-contractsv4.90/contracts/token/ERC20/extensions/ERC20Burnable.sol";
-import {IERC20} from "./lib/openzeppelin-contractsv4.90/contracts/token/ERC20/IERC20.sol";
-import "./lib/openzeppelin-contractsv4.90/contracts/token/ERC20/extensions/ERC20Permit.sol";
+import {ERC20} from "./lib/openzeppelinv4.90/contracts/token/ERC20/ERC20.sol";
+import {ERC20Burnable} from "./lib/openzeppelinv4.90/contracts/token/ERC20/extensions/ERC20Burnable.sol";
+import {IERC20} from "./lib/openzeppelinv4.90/contracts/token/ERC20/IERC20.sol";
+import "./lib/openzeppelinv4.90/contracts/token/ERC20/extensions/ERC20Permit.sol";
 
-import {Ownable} from "./lib/openzeppelin-contractsv4.90/contracts/access/Ownable2Step.sol";
+import {Ownable} from "./lib/openzeppelinv4.90/contracts/access/Ownable2Step.sol";
 import {SafeTransferLib} from "./lib/solmate/src/utils/SafeTransferLib.sol";
 import {IUniswapV2Router02} from "./interfaces/IUniswapV2Router02.sol";
 import {IUniswapV2Factory} from "./interfaces/IUniswapV2Factory.sol";

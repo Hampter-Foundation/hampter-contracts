@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.19;
 
-
 import {ERC20} from "./lib/openzeppelin-v4.90/contracts/token/ERC20/ERC20.sol";
 import {ERC20Burnable} from "./lib/openzeppelin-v4.90/contracts/token/ERC20/extensions/ERC20Burnable.sol";
 import {IERC20} from "./lib/openzeppelin-v4.90/contracts/token/ERC20/IERC20.sol";
@@ -15,7 +14,7 @@ import {IUniswapV2Router02} from "./interfaces/IUniswapV2Router02.sol";
 import {IUniswapV2Factory} from "./interfaces/IUniswapV2Factory.sol";
 
 // https://www.playhampter.com/
-contract HampToken is ERC20, Ownable, ERC20Burnable  {
+contract HampToken is ERC20, Ownable, ERC20Burnable {
     using SafeTransferLib for address payable;
 
     IUniswapV2Router02 public immutable uniswapV2Router;
@@ -34,8 +33,6 @@ contract HampToken is ERC20, Ownable, ERC20Burnable  {
     bool public limitsInEffect = true;
     bool public tradingActive = false;
     bool public swapEnabled = false;
-
-    bool public blacklistRenounced = false;
 
     // Anti-bot and anti-whale mappings and variables
     mapping(address => bool) blacklisted;
@@ -58,13 +55,14 @@ contract HampToken is ERC20, Ownable, ERC20Burnable  {
 
     // exclude addresses from fees and max transaction amount
     mapping(address => bool) private _isExcludedFromFees;
-    mapping(address => bool) public _isExcludedMaxTransactionAmount;
 
     // store addresses that a automatic market maker pairs. Any transfer *to* these addresses
     // could be subject to a maximum transfer amount
     mapping(address => bool) public automatedMarketMakerPairs;
 
     bool public preMigrationPhase = true;
+
+    // the pre-migration phase is before the token is fully launched and traded.
     mapping(address => bool) public preMigrationTransferrable;
 
     event UpdateUniswapV2Router(
@@ -92,10 +90,12 @@ contract HampToken is ERC20, Ownable, ERC20Burnable  {
         uint256 tokensIntoLiquidity
     );
 
-    constructor(address _thrusterRouter) ERC20("Hampter Token", "HAMP") Ownable() {
+    constructor(
+        address _thrusterRouter
+    ) ERC20("Hampter Token", "HAMP") Ownable() {
         IUniswapV2Router02 _uniswapV2Router = IUniswapV2Router02(
-           _thrusterRouter // 0x98994a9A7a2570367554589189dC9772241650f6 thruster router
-        ); 
+            _thrusterRouter // 0x98994a9A7a2570367554589189dC9772241650f6 thruster router
+        );
 
         uniswapV2Router = _uniswapV2Router;
 
@@ -130,7 +130,7 @@ contract HampToken is ERC20, Ownable, ERC20Burnable  {
         sellTotalFees = sellRevShareFee + sellLiquidityFee + sellTeamFee;
 
         teamWallet = owner(); // set as team wallet
-        revShareWallet = owner(); // intial revShare wallet address. Can be updated later. 
+        revShareWallet = owner(); // intial revShare wallet address. Can be updated later.
 
         // exclude from paying fees or having max transaction amount
         excludeFromFees(owner(), true);
@@ -146,7 +146,6 @@ contract HampToken is ERC20, Ownable, ERC20Burnable  {
         _mint(msg.sender, totalSupply);
     }
 
- 
     /// @dev Owner has to enable trading before the token can be traded
     // once enabled, can never be turned off
     function enableTrading() external onlyOwner {
@@ -176,10 +175,6 @@ contract HampToken is ERC20, Ownable, ERC20Burnable  {
         swapTokensAtAmount = newAmount;
         return true;
     }
-
-
-
-
 
     // only use to disable contract sales if absolutely necessary (emergency use only)
     function updateSwapEnabled(bool enabled) external onlyOwner {
@@ -253,7 +248,7 @@ contract HampToken is ERC20, Ownable, ERC20Burnable  {
         return blacklisted[account];
     }
 
-    /// @dev Override the transfer function to add the fees
+    /// @dev Override the transfer function to tax
     function _transfer(
         address from,
         address to,
@@ -292,10 +287,7 @@ contract HampToken is ERC20, Ownable, ERC20Burnable  {
                 }
 
                 //when buy
-                if (
-                    automatedMarketMakerPairs[from] &&
-                    !_isExcludedMaxTransactionAmount[to]
-                ) {
+                if (automatedMarketMakerPairs[from]) {
                     require(
                         amount <= maxTransactionAmount,
                         "Buy transfer amount exceeds the maxTransactionAmount."
@@ -305,20 +297,11 @@ contract HampToken is ERC20, Ownable, ERC20Burnable  {
                         "Max wallet exceeded"
                     );
                 }
-                
                 //when sell
-                else if (
-                    automatedMarketMakerPairs[to] &&
-                    !_isExcludedMaxTransactionAmount[from]
-                ) {
+                else if (automatedMarketMakerPairs[to]) {
                     require(
                         amount <= maxTransactionAmount,
                         "Sell transfer amount exceeds the maxTransactionAmount."
-                    );
-                } else if (!_isExcludedMaxTransactionAmount[to]) {
-                    require(
-                        amount + balanceOf(to) <= maxWallet,
-                        "Max wallet exceeded"
                     );
                 }
             }
@@ -355,14 +338,14 @@ contract HampToken is ERC20, Ownable, ERC20Burnable  {
         if (takeFee) {
             // on sell
             if (automatedMarketMakerPairs[to] && sellTotalFees > 0) {
-                fees = amount * sellTotalFees / 100;
+                fees = (amount * sellTotalFees) / 100;
                 tokensForLiquidity += (fees * sellLiquidityFee) / sellTotalFees;
                 tokensForTeam += (fees * sellTeamFee) / sellTotalFees;
                 tokensForRevShare += (fees * sellRevShareFee) / sellTotalFees;
             }
             // on buy
             else if (automatedMarketMakerPairs[from] && buyTotalFees > 0) {
-                fees = amount * buyTotalFees / 100; // NOTE: Is this correct?
+                fees = (amount * buyTotalFees) / 100; // NOTE: Is this correct?
                 tokensForLiquidity += (fees * buyLiquidityFee) / buyTotalFees;
                 tokensForTeam += (fees * buyTeamFee) / buyTotalFees;
                 tokensForRevShare += (fees * buyRevShareFee) / buyTotalFees;
@@ -376,6 +359,18 @@ contract HampToken is ERC20, Ownable, ERC20Burnable  {
         }
 
         super._transfer(from, to, amount);
+    }
+
+    function _distributeFees(
+        uint256 fees,
+        uint256 liquidityFee,
+        uint256 teamFee,
+        uint256 revShareFee,
+        uint256 totalFees
+    ) private {
+        tokensForLiquidity += (fees * liquidityFee) / totalFees;
+        tokensForTeam += (fees * teamFee) / totalFees;
+        tokensForRevShare += (fees * revShareFee) / totalFees;
     }
 
     function swapTokensForEth(uint256 tokenAmount) private {
@@ -444,13 +439,11 @@ contract HampToken is ERC20, Ownable, ERC20Burnable  {
 
         uint256 ethBalance = address(this).balance - initialETHBalance;
 
-        uint256 ethForRevShare = ethBalance * tokensForRevShare / (
-            totalTokensToSwap - (tokensForLiquidity / 2)
-        );
+        uint256 ethForRevShare = (ethBalance * tokensForRevShare) /
+            (totalTokensToSwap - (tokensForLiquidity / 2));
 
-        uint256 ethForTeam = ethBalance * tokensForTeam / (
-            totalTokensToSwap - (tokensForLiquidity / 2)
-        );
+        uint256 ethForTeam = (ethBalance * tokensForTeam) /
+            (totalTokensToSwap - (tokensForLiquidity / 2));
 
         uint256 ethForLiquidity = ethBalance - ethForRevShare - ethForTeam;
 
@@ -485,16 +478,10 @@ contract HampToken is ERC20, Ownable, ERC20Burnable  {
         payable(toAddr).safeTransferETH(address(this).balance);
     }
 
-    // @dev team renounce blacklist commands
-    function renounceBlacklist() public onlyOwner {
-        blacklistRenounced = true;
-    }
-
     function blacklist(address _addr) public onlyOwner {
-        require(!blacklistRenounced, "Team has revoked blacklist rights");
         require(
             _addr != address(uniswapV2Pair) &&
-               // TODO change this 
+                // TODO change this
                 _addr != address(0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D),
             "Cannot blacklist token's v2 router or v2 pool."
         );
@@ -503,11 +490,10 @@ contract HampToken is ERC20, Ownable, ERC20Burnable  {
 
     /// @dev blacklist v3 pools; can unblacklist() down the road to suit project and community
     function blacklistLiquidityPool(address lpAddress) public onlyOwner {
-        require(!blacklistRenounced, "Team has revoked blacklist rights");
         require(
             lpAddress != address(uniswapV2Pair) &&
                 lpAddress !=
-                // TODO change this 
+                // TODO change this
                 address(0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D),
             "Cannot blacklist token's v2 router or v2 pool."
         );
@@ -530,4 +516,3 @@ contract HampToken is ERC20, Ownable, ERC20Burnable  {
 
     receive() external payable {}
 }
-

@@ -21,14 +21,15 @@ contract HampToken is ERC20, Ownable, ERC20Burnable {
     address public immutable uniswapV2Pair;
     address public constant deadAddress = address(0xdead);
 
-    bool private swapping;
+    /// @dev Reentrancy guard for swap operations
+    /// When true, prevents recursive swaps during token transfers
+    /// Acts as a mutex to ensure only one swap operation occurs at a time
+    bool private isSwapInProgress;
 
     address public revShareWallet;
     address public teamWallet;
 
-    uint256 public maxTransactionAmount;
     uint256 public swapTokensAtAmount;
-    uint256 public maxWallet;
 
     bool public limitsInEffect = true;
     bool public tradingActive = false;
@@ -113,21 +114,19 @@ contract HampToken is ERC20, Ownable, ERC20Burnable {
         uint256 _sellLiquidityFee = 1; // 1% gets added back as liquidity provision to support the $HAMP economy.
         uint256 _sellTeamFee = 2; // 1% goes to the developers of Hampter
 
-        uint256 totalSupply = 10_000_000 * 1e18;
+        uint256 totalSupply = 10_000_000 * 1e18; // 10 million tokens
 
-        maxTransactionAmount = 5_000 * 1e18; // 0.05% of total supply
-        maxWallet = 5_000 * 1e18; // 0.05% of total supply
         swapTokensAtAmount = (totalSupply * 5) / 10000; // 0.05% of total supply
 
-        buyRevShareFee = _buyRevShareFee;
-        buyLiquidityFee = _buyLiquidityFee;
-        buyTeamFee = _buyTeamFee;
-        buyTotalFees = buyRevShareFee + buyLiquidityFee + buyTeamFee;
+        buyRevShareFee = _buyRevShareFee; // 2%
+        buyLiquidityFee = _buyLiquidityFee; // 1%
+        buyTeamFee = _buyTeamFee; // 2%
+        buyTotalFees = buyRevShareFee + buyLiquidityFee + buyTeamFee; // 2% + 1% + 2% = 5%
 
-        sellRevShareFee = _sellRevShareFee;
-        sellLiquidityFee = _sellLiquidityFee;
-        sellTeamFee = _sellTeamFee;
-        sellTotalFees = sellRevShareFee + sellLiquidityFee + sellTeamFee;
+        sellRevShareFee = _sellRevShareFee; // 2%
+        sellLiquidityFee = _sellLiquidityFee; // 1%
+        sellTeamFee = _sellTeamFee; // 2%
+        sellTotalFees = sellRevShareFee + sellLiquidityFee + sellTeamFee; // 2% + 1% + 2% = 5%
 
         teamWallet = owner(); // set as team wallet
         revShareWallet = owner(); // intial revShare wallet address. Can be updated later.
@@ -164,6 +163,7 @@ contract HampToken is ERC20, Ownable, ERC20Burnable {
     function updateSwapTokensAtAmount(
         uint256 newAmount
     ) external onlyOwner returns (bool) {
+        // TODO: Revisit this logic
         require(
             newAmount >= (totalSupply() * 1) / 100000,
             "Swap amount cannot be lower than 0.001% total supply."
@@ -277,7 +277,7 @@ contract HampToken is ERC20, Ownable, ERC20Burnable {
                 to != owner() &&
                 to != address(0) &&
                 to != address(0xdead) &&
-                !swapping
+                !isSwapInProgress
             ) {
                 if (!tradingActive) {
                     require(
@@ -285,70 +285,63 @@ contract HampToken is ERC20, Ownable, ERC20Burnable {
                         "Trading is not active."
                     );
                 }
-
-                //when buy
-                if (automatedMarketMakerPairs[from]) {
-                    require(
-                        amount <= maxTransactionAmount,
-                        "Buy transfer amount exceeds the maxTransactionAmount."
-                    );
-                    require(
-                        amount + balanceOf(to) <= maxWallet,
-                        "Max wallet exceeded"
-                    );
-                }
-                //when sell
-                else if (automatedMarketMakerPairs[to]) {
-                    require(
-                        amount <= maxTransactionAmount,
-                        "Sell transfer amount exceeds the maxTransactionAmount."
-                    );
-                }
             }
         }
 
         uint256 contractTokenBalance = balanceOf(address(this));
 
-        bool canSwap = contractTokenBalance >= swapTokensAtAmount;
+        // Check if the contract has accumulated enough $HAMP to trigger a swapBack
+        bool hasSufficientTokensForSwap = contractTokenBalance >=
+            swapTokensAtAmount;
 
         if (
-            canSwap &&
+            hasSufficientTokensForSwap &&
             swapEnabled &&
-            !swapping &&
+            !isSwapInProgress &&
             !automatedMarketMakerPairs[from] &&
             !_isExcludedFromFees[from] &&
             !_isExcludedFromFees[to]
         ) {
-            swapping = true;
+            isSwapInProgress = true;
 
             swapBack();
 
-            swapping = false;
+            isSwapInProgress = false;
         }
 
-        bool takeFee = !swapping;
+        /// @dev Determines if fees should be applied to the current transfer
+        /// Fees are not applied during swap operations to prevent double-charging
+        bool shouldApplyFees = !isSwapInProgress;
 
         // if any account belongs to _isExcludedFromFee account then remove the fee
         if (_isExcludedFromFees[from] || _isExcludedFromFees[to]) {
-            takeFee = false;
+            shouldApplyFees = false;
         }
 
         uint256 fees = 0;
         // only take fees on buys/sells, do not take on wallet transfers
-        if (takeFee) {
+        if (shouldApplyFees) {
             // on sell
             if (automatedMarketMakerPairs[to] && sellTotalFees > 0) {
                 fees = (amount * sellTotalFees) / 100;
-                tokensForLiquidity += (fees * sellLiquidityFee) / sellTotalFees;
-                tokensForTeam += (fees * sellTeamFee) / sellTotalFees;
-                tokensForRevShare += (fees * sellRevShareFee) / sellTotalFees;
+                _accountForFees(
+                    fees,
+                    sellLiquidityFee,
+                    sellTeamFee,
+                    sellRevShareFee,
+                    sellTotalFees
+                );
             }
             // on buy
             else if (automatedMarketMakerPairs[from] && buyTotalFees > 0) {
                 fees = (amount * buyTotalFees) / 100; // NOTE: Is this correct?
-                tokensForLiquidity += (fees * buyLiquidityFee) / buyTotalFees;
-                tokensForTeam += (fees * buyTeamFee) / buyTotalFees;
-                tokensForRevShare += (fees * buyRevShareFee) / buyTotalFees;
+                _accountForFees(
+                    fees,
+                    buyLiquidityFee,
+                    buyTeamFee,
+                    buyRevShareFee,
+                    buyTotalFees
+                );
             }
 
             if (fees > 0) {
@@ -361,7 +354,13 @@ contract HampToken is ERC20, Ownable, ERC20Burnable {
         super._transfer(from, to, amount);
     }
 
-    function _distributeFees(
+    /// @dev Accounts for the increase in tokens for different purposes based on collected fees
+    /// @param fees The total amount of fees collected
+    /// @param liquidityFee The percentage of fees allocated for liquidity
+    /// @param teamFee The percentage of fees allocated for the team
+    /// @param revShareFee The percentage of fees allocated for revenue sharing
+    /// @param totalFees The total of all fee percentages
+    function _accountForFees(
         uint256 fees,
         uint256 liquidityFee,
         uint256 teamFee,

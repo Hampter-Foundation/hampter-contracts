@@ -88,6 +88,7 @@ contract HampterNFT is Ownable, ERC721A, ReentrancyGuard {
         refundIfOver(publicPrice * quantity);
     }
 
+    /// @dev Logic to check payment for mint
     function refundIfOver(uint256 price) private {
         require(msg.value >= price, "Need to send more ETH.");
         if (msg.value > price) {

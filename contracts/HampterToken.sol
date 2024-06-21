@@ -52,6 +52,8 @@ contract HampToken is ERC20, Ownable, ERC20Burnable {
     uint256 public tokensForLiquidity;
     uint256 public tokensForTeam;
 
+    uint256 private constant MAX_SWAP_MULTIPLIER = 20;
+
     /******************/
 
     // exclude addresses from fees and max transaction amount
@@ -290,7 +292,7 @@ contract HampToken is ERC20, Ownable, ERC20Burnable {
 
         uint256 contractTokenBalance = balanceOf(address(this));
 
-        // Check if the contract has accumulated enough $HAMP to trigger a swapBack
+        // Check if the contract has accumulated enough $HAMP to trigger a _swapBack
         bool hasSufficientTokensForSwap = contractTokenBalance >=
             swapTokensAtAmount;
 
@@ -304,7 +306,7 @@ contract HampToken is ERC20, Ownable, ERC20Burnable {
         ) {
             isSwapInProgress = true;
 
-            swapBack();
+            _swapBack();
 
             isSwapInProgress = false;
         }
@@ -354,12 +356,69 @@ contract HampToken is ERC20, Ownable, ERC20Burnable {
         super._transfer(from, to, amount);
     }
 
+    /**
+     * @dev Swaps the tokens collected as fees into ETH and splits them into three parts:
+     * 1. ETH for liquidity for $HAM - 1%
+     * 2. ETH for ecosystem development - 2%
+     * 3. ETH for PVE and PVP rewards - 2%
+     * The Swap happens when the contract accrues more than 500 $HAM tokens.
+     */
+    function _swapBack() private {
+        uint256 contractBalance = balanceOf(address(this));
+        uint256 totalTokensToSwap = tokensForLiquidity +
+            tokensForRevShare +
+            tokensForTeam;
+
+        if (contractBalance == 0 || totalTokensToSwap == 0) {
+            return;
+        }
+
+        // Cap the swap amount to prevent price impact and ensure more frequent, smaller swaps
+        if (contractBalance > swapTokensAtAmount * MAX_SWAP_MULTIPLIER) {
+            contractBalance = swapTokensAtAmount * MAX_SWAP_MULTIPLIER;
+        }
+
+        // Halve the amount of liquidity tokens
+        uint256 liquidityTokens = (contractBalance * tokensForLiquidity) /
+            totalTokensToSwap /
+            2;
+
+        uint256 amountToSwapForETH = contractBalance - liquidityTokens;
+
+        uint256 initialETHBalance = address(this).balance;
+
+        swapTokensForEth(amountToSwapForETH);
+
+        uint256 ethBalance = address(this).balance - initialETHBalance;
+
+        // Calculate ETH distribution
+        uint256 ethForRevShare = (ethBalance * tokensForRevShare) /
+            (totalTokensToSwap - (tokensForLiquidity / 2));
+
+        uint256 ethForTeam = (ethBalance * tokensForTeam) /
+            (totalTokensToSwap - (tokensForLiquidity / 2));
+
+        uint256 ethForLiquidity = ethBalance - ethForRevShare - ethForTeam;
+
+        tokensForLiquidity = 0;
+        tokensForRevShare = 0;
+        tokensForTeam = 0;
+
+        payable(teamWallet).safeTransferETH(ethForTeam); // Transfer ETH to team wallet
+
+        if (liquidityTokens > 0 && ethForLiquidity > 0) {
+            addLiquidity(liquidityTokens, ethForLiquidity);
+            emit SwapAndLiquify(
+                amountToSwapForETH,
+                ethForLiquidity,
+                tokensForLiquidity
+            );
+        }
+
+        payable(revShareWallet).safeTransferETH(address(this).balance);
+    }
+
     /// @dev Accounts for the increase in tokens for different purposes based on collected fees
-    /// @param fees The total amount of fees collected
-    /// @param liquidityFee The percentage of fees allocated for liquidity
-    /// @param teamFee The percentage of fees allocated for the team
-    /// @param revShareFee The percentage of fees allocated for revenue sharing
-    /// @param totalFees The total of all fee percentages
     function _accountForFees(
         uint256 fees,
         uint256 liquidityFee,
@@ -372,6 +431,9 @@ contract HampToken is ERC20, Ownable, ERC20Burnable {
         tokensForRevShare += (fees * revShareFee) / totalFees;
     }
 
+    /**
+     * @dev Swaps a specific amount of the contract's tokens for ETH using Uniswap Fork
+     */
     function swapTokensForEth(uint256 tokenAmount) private {
         // generate the uniswap pair path of token -> weth
         address[] memory path = new address[](2);
@@ -405,65 +467,6 @@ contract HampToken is ERC20, Ownable, ERC20Burnable {
         );
     }
 
-    /**
-     * @dev Swaps the tokens collected as fees into ETH and splits them into three parts:
-     * 1. ETH for liquidity for $HAM - 1%
-     * 2. ETH for ecosystem development - 2%
-     * 3. ETH for PVE and PVP rewards - 2%
-     * The Swap happens when the contract accrues more than 500 $HAM tokens.
-     */
-    function swapBack() private {
-        uint256 contractBalance = balanceOf(address(this));
-        uint256 totalTokensToSwap = tokensForLiquidity +
-            tokensForRevShare +
-            tokensForTeam;
-
-        if (contractBalance == 0 || totalTokensToSwap == 0) {
-            return;
-        }
-
-        if (contractBalance > swapTokensAtAmount * 20) {
-            contractBalance = swapTokensAtAmount * 20;
-        }
-
-        // Halve the amount of liquidity tokens
-        uint256 liquidityTokens = (contractBalance * tokensForLiquidity) /
-            totalTokensToSwap /
-            2;
-        uint256 amountToSwapForETH = contractBalance - liquidityTokens;
-
-        uint256 initialETHBalance = address(this).balance;
-
-        swapTokensForEth(amountToSwapForETH);
-
-        uint256 ethBalance = address(this).balance - initialETHBalance;
-
-        uint256 ethForRevShare = (ethBalance * tokensForRevShare) /
-            (totalTokensToSwap - (tokensForLiquidity / 2));
-
-        uint256 ethForTeam = (ethBalance * tokensForTeam) /
-            (totalTokensToSwap - (tokensForLiquidity / 2));
-
-        uint256 ethForLiquidity = ethBalance - ethForRevShare - ethForTeam;
-
-        tokensForLiquidity = 0;
-        tokensForRevShare = 0;
-        tokensForTeam = 0;
-
-        payable(teamWallet).safeTransferETH(ethForTeam);
-
-        if (liquidityTokens > 0 && ethForLiquidity > 0) {
-            addLiquidity(liquidityTokens, ethForLiquidity);
-            emit SwapAndLiquify(
-                amountToSwapForETH,
-                ethForLiquidity,
-                tokensForLiquidity
-            );
-        }
-
-        payable(revShareWallet).safeTransferETH(address(this).balance);
-    }
-
     function withdrawStuckToken(
         address _token,
         address _to
@@ -480,26 +483,13 @@ contract HampToken is ERC20, Ownable, ERC20Burnable {
     function blacklist(address _addr) public onlyOwner {
         require(
             _addr != address(uniswapV2Pair) &&
-                // TODO change this
-                _addr != address(0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D),
+                _addr != address(uniswapV2Router),
             "Cannot blacklist token's v2 router or v2 pool."
         );
         blacklisted[_addr] = true;
     }
 
-    /// @dev blacklist v3 pools; can unblacklist() down the road to suit project and community
-    function blacklistLiquidityPool(address lpAddress) public onlyOwner {
-        require(
-            lpAddress != address(uniswapV2Pair) &&
-                lpAddress !=
-                // TODO change this
-                address(0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D),
-            "Cannot blacklist token's v2 router or v2 pool."
-        );
-        blacklisted[lpAddress] = true;
-    }
-
-    // @dev unblacklist address; not affected by blacklistRenounced incase team wants to unblacklist v3 pools down the road
+    /// @dev unblacklist address; not affected by blacklistRenounced incase team wants to unblacklist v3 pools down the road
     function unblacklist(address _addr) public onlyOwner {
         blacklisted[_addr] = false;
     }

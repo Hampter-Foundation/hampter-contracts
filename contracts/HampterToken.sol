@@ -3,6 +3,7 @@ pragma solidity 0.8.19;
 
 import {ERC20} from "./lib/openzeppelin-v4.90/contracts/token/ERC20/ERC20.sol";
 import {ERC20Burnable} from "./lib/openzeppelin-v4.90/contracts/token/ERC20/extensions/ERC20Burnable.sol";
+import {ERC20Permit} from "./lib/openzeppelin-v4.90/contracts/token/ERC20/extensions/ERC20Permit.sol";
 import {IERC20} from "./lib/openzeppelin-v4.90/contracts/token/ERC20/IERC20.sol";
 
 import {Ownable} from "./lib/openzeppelin-v4.90/contracts/access/Ownable.sol";
@@ -14,7 +15,7 @@ import {IUniswapV2Router02} from "./interfaces/IUniswapV2Router02.sol";
 import {IUniswapV2Factory} from "./interfaces/IUniswapV2Factory.sol";
 
 // https://www.playhampter.com/
-contract HampToken is ERC20, Ownable, ERC20Burnable {
+contract HampToken is ERC20, Ownable, ERC20Burnable, ERC20Permit {
     using SafeTransferLib for address payable;
 
     IUniswapV2Router02 public immutable uniswapV2Router;

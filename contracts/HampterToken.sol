@@ -96,7 +96,7 @@ contract HampToken is ERC20, Ownable, ERC20Burnable, ERC20Permit {
 
     constructor(
         address _thrusterRouter
-    ) ERC20("Hampter Token", "HAMP") Ownable() {
+    ) ERC20("Hampter Token", "HAMP") Ownable() ERC20Permit("Hampter Token") {
         IUniswapV2Router02 _uniswapV2Router = IUniswapV2Router02(
             _thrusterRouter // 0x98994a9A7a2570367554589189dC9772241650f6 thruster router
         );

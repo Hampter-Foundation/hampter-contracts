@@ -42,7 +42,13 @@ library Strings {
      * @dev Converts a `int256` to its ASCII `string` decimal representation.
      */
     function toString(int256 value) internal pure returns (string memory) {
-        return string(abi.encodePacked(value < 0 ? "-" : "", toString(SignedMath.abs(value))));
+        return
+            string(
+                abi.encodePacked(
+                    value < 0 ? "-" : "",
+                    toString(SignedMath.abs(value))
+                )
+            );
     }
 
     /**
@@ -57,7 +63,10 @@ library Strings {
     /**
      * @dev Converts a `uint256` to its ASCII `string` hexadecimal representation with fixed length.
      */
-    function toHexString(uint256 value, uint256 length) internal pure returns (string memory) {
+    function toHexString(
+        uint256 value,
+        uint256 length
+    ) internal pure returns (string memory) {
         bytes memory buffer = new bytes(2 * length + 2);
         buffer[0] = "0";
         buffer[1] = "x";
@@ -79,7 +88,10 @@ library Strings {
     /**
      * @dev Returns true if the two strings are equal.
      */
-    function equal(string memory a, string memory b) internal pure returns (bool) {
+    function equal(
+        string memory a,
+        string memory b
+    ) internal pure returns (bool) {
         return keccak256(bytes(a)) == keccak256(bytes(b));
     }
 }

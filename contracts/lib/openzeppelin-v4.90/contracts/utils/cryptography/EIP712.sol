@@ -36,7 +36,9 @@ abstract contract EIP712 is IERC5267 {
     using ShortStrings for *;
 
     bytes32 private constant _TYPE_HASH =
-        keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)");
+        keccak256(
+            "EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"
+        );
 
     // Cache the domain separator as an immutable value, but also store the chain id that it corresponds to, in order to
     // invalidate the cached domain separator if the chain id changes.
@@ -87,7 +89,16 @@ abstract contract EIP712 is IERC5267 {
     }
 
     function _buildDomainSeparator() private view returns (bytes32) {
-        return keccak256(abi.encode(_TYPE_HASH, _hashedName, _hashedVersion, block.chainid, address(this)));
+        return
+            keccak256(
+                abi.encode(
+                    _TYPE_HASH,
+                    _hashedName,
+                    _hashedVersion,
+                    block.chainid,
+                    address(this)
+                )
+            );
     }
 
     /**
@@ -105,7 +116,9 @@ abstract contract EIP712 is IERC5267 {
      * address signer = ECDSA.recover(digest, signature);
      * ```
      */
-    function _hashTypedDataV4(bytes32 structHash) internal view virtual returns (bytes32) {
+    function _hashTypedDataV4(
+        bytes32 structHash
+    ) internal view virtual returns (bytes32) {
         return ECDSA.toTypedDataHash(_domainSeparatorV4(), structHash);
     }
 

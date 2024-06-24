@@ -39,7 +39,8 @@ type ShortString is bytes32;
  */
 library ShortStrings {
     // Used as an identifier for strings longer than 31 bytes.
-    bytes32 private constant _FALLBACK_SENTINEL = 0x00000000000000000000000000000000000000000000000000000000000000FF;
+    bytes32 private constant _FALLBACK_SENTINEL =
+        0x00000000000000000000000000000000000000000000000000000000000000FF;
 
     error StringTooLong(string str);
     error InvalidShortString();
@@ -49,7 +50,9 @@ library ShortStrings {
      *
      * This will trigger a `StringTooLong` error is the input string is too long.
      */
-    function toShortString(string memory str) internal pure returns (ShortString) {
+    function toShortString(
+        string memory str
+    ) internal pure returns (ShortString) {
         bytes memory bstr = bytes(str);
         if (bstr.length > 31) {
             revert StringTooLong(str);
@@ -86,7 +89,10 @@ library ShortStrings {
     /**
      * @dev Encode a string into a `ShortString`, or write it to storage if it is too long.
      */
-    function toShortStringWithFallback(string memory value, string storage store) internal returns (ShortString) {
+    function toShortStringWithFallback(
+        string memory value,
+        string storage store
+    ) internal returns (ShortString) {
         if (bytes(value).length < 32) {
             return toShortString(value);
         } else {
@@ -98,7 +104,10 @@ library ShortStrings {
     /**
      * @dev Decode a string that was encoded to `ShortString` or written to storage using {setWithFallback}.
      */
-    function toStringWithFallback(ShortString value, string storage store) internal pure returns (string memory) {
+    function toStringWithFallback(
+        ShortString value,
+        string storage store
+    ) internal pure returns (string memory) {
         if (ShortString.unwrap(value) != _FALLBACK_SENTINEL) {
             return toString(value);
         } else {
@@ -112,7 +121,10 @@ library ShortStrings {
      * WARNING: This will return the "byte length" of the string. This may not reflect the actual length in terms of
      * actual characters as the UTF-8 encoding of a single character can span over multiple bytes.
      */
-    function byteLengthWithFallback(ShortString value, string storage store) internal view returns (uint256) {
+    function byteLengthWithFallback(
+        ShortString value,
+        string storage store
+    ) internal view returns (uint256) {
         if (ShortString.unwrap(value) != _FALLBACK_SENTINEL) {
             return byteLength(value);
         } else {

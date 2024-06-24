@@ -347,10 +347,9 @@ contract HampToken is ERC20, Ownable, ERC20Burnable, ERC20Permit {
             if (fees > 0) {
                 super._transfer(from, address(this), fees);
             }
-
+            amount -= fees;
         }
 
-            amount -= fees;
         super._transfer(from, to, amount);
     }
 
@@ -426,9 +425,13 @@ contract HampToken is ERC20, Ownable, ERC20Burnable, ERC20Permit {
         uint256 revShareFee,
         uint256 totalFees
     ) private {
-        tokensForLiquidity += (fees * liquidityFee) / totalFees;
-        tokensForTeam += (fees * teamFee) / totalFees;
-        tokensForRevShare += (fees * revShareFee) / totalFees;
+        tokensForLiquidity = tokensForLiquidity.add(
+            fees.mul(liquidityFee).div(totalFees)
+        );
+        tokensForTeam = tokensForTeam.add(fees.mul(teamFee).div(totalFees));
+        tokensForRevShare = tokensForRevShare.add(
+            fees.mul(revShareFee).div(totalFees)
+        );
     }
 
     /**

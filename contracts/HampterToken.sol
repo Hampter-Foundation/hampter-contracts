@@ -31,13 +31,14 @@ contract HampToken is ERC20, Ownable, ERC20Burnable, ERC20Permit {
     address public revShareWallet;
     address public teamWallet;
 
+
     bool public limitsInEffect = true;
     bool public tradingActive = false;
     bool public swapEnabled = false;
 
     // Anti-bot and anti-whale mappings and variables
     mapping(address => bool) blacklisted;
-
+    
     uint256 private constant FEE_PERCENTAGE_SCALE = 10000; // 100.00%
     uint256 private constant MAX_SWAP_MULTIPLIER = 20; // Multiplier to cap the swap amonut of $HAMP in swapback
     uint256 public swapTokensAtAmount;
@@ -54,6 +55,7 @@ contract HampToken is ERC20, Ownable, ERC20Burnable, ERC20Permit {
     uint256 public tokensForRevShare;
     uint256 public tokensForLiquidity;
     uint256 public tokensForTeam;
+
 
     /******************/
 
@@ -250,9 +252,9 @@ contract HampToken is ERC20, Ownable, ERC20Burnable, ERC20Permit {
         return blacklisted[account];
     }
 
-    /** @dev Override the transfer function to tax
+    /** @dev Override the transfer function to tax 
      * The $HAMP taxed will be accumulated in the contract and swapped for ETH to be distributed to the team, revShare and liquidity after it has hit `swapTokensAtAmount`
-     * */
+     * */ 
     function _transfer(
         address from,
         address to,
@@ -273,7 +275,8 @@ contract HampToken is ERC20, Ownable, ERC20Burnable, ERC20Permit {
         bool isExcludedFrom = _isExcludedFromFees[from];
         bool isExcludedTo = _isExcludedFromFees[to];
 
-        if (amount == 0 || isExcludedFrom || isExcludedTo) {
+
+        if (amount == 0) {
             super._transfer(from, to, 0);
             return;
         }
@@ -305,7 +308,9 @@ contract HampToken is ERC20, Ownable, ERC20Burnable, ERC20Permit {
             hasSufficientTokensForSwap &&
             swapEnabled &&
             !isSwapInProgress &&
-            !automatedMarketMakerPairs[from]
+            !automatedMarketMakerPairs[from] &&
+            !isExcludedFrom &&
+            !isExcludedTo
         ) {
             isSwapInProgress = true;
 
@@ -316,10 +321,16 @@ contract HampToken is ERC20, Ownable, ERC20Burnable, ERC20Permit {
 
         /// @dev Determines if fees should be applied to the current transfer
         /// Fees are not applied during swap operations to prevent double-charging
+        bool shouldApplyFees = !isSwapInProgress;
+
+        // if any account belongs to _isExcludedFromFee account then remove the fee
+        if (isExcludedFrom || isExcludedTo) {
+            shouldApplyFees = false;
+        }
 
         uint256 fees = 0;
         // only take fees on buys/sells, do not take on wallet transfers
-        if (!isSwapInProgress) {
+        if (shouldApplyFees) {
             // on sell
             if (automatedMarketMakerPairs[to] && sellTotalFees > 0) {
                 fees = calculateFee(amount, sellTotalFees);
@@ -347,6 +358,7 @@ contract HampToken is ERC20, Ownable, ERC20Burnable, ERC20Permit {
             if (fees > 0) {
                 super._transfer(from, address(this), fees);
             }
+
             amount -= fees;
         }
 
@@ -389,11 +401,9 @@ contract HampToken is ERC20, Ownable, ERC20Burnable, ERC20Permit {
         uint256 ethBalance = address(this).balance - initialETHBalance;
 
         // Calculate ETH distribution
-        uint256 actualTokensSwapped = totalTokensToSwap -
-            (tokensForLiquidity / 2);
-
-        uint256 ethForRevShare = (ethBalance * tokensForRevShare) /
-            actualTokensSwapped; // denominator that reflects the actual amount of tokens that were swapped, not the original totalTokensToSwap.
+        uint256 actualTokensSwapped = totalTokensToSwap - (tokensForLiquidity / 2);
+       
+        uint256 ethForRevShare = (ethBalance * tokensForRevShare) / actualTokensSwapped; // denominator that reflects the actual amount of tokens that were swapped, not the original totalTokensToSwap.
         uint256 ethForTeam = (ethBalance * tokensForTeam) / actualTokensSwapped;
         uint256 ethForLiquidity = ethBalance - ethForRevShare - ethForTeam;
 
@@ -425,13 +435,9 @@ contract HampToken is ERC20, Ownable, ERC20Burnable, ERC20Permit {
         uint256 revShareFee,
         uint256 totalFees
     ) private {
-        tokensForLiquidity = tokensForLiquidity.add(
-            fees.mul(liquidityFee).div(totalFees)
-        );
+        tokensForLiquidity = tokensForLiquidity.add(fees.mul(liquidityFee).div(totalFees));
         tokensForTeam = tokensForTeam.add(fees.mul(teamFee).div(totalFees));
-        tokensForRevShare = tokensForRevShare.add(
-            fees.mul(revShareFee).div(totalFees)
-        );
+        tokensForRevShare = tokensForRevShare.add(fees.mul(revShareFee).div(totalFees));
     }
 
     /**
@@ -506,10 +512,7 @@ contract HampToken is ERC20, Ownable, ERC20Burnable, ERC20Permit {
         excludeFromFees(_addr, isAuthorized);
     }
 
-    function calculateFee(
-        uint256 amount,
-        uint256 feePercentage
-    ) internal pure returns (uint256) {
+    function calculateFee(uint256 amount, uint256 feePercentage) internal pure returns (uint256) {
         return amount.mul(feePercentage).div(FEE_PERCENTAGE_SCALE);
     }
 

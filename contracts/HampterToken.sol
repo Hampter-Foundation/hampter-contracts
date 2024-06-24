@@ -273,7 +273,7 @@ contract HampToken is ERC20, Ownable, ERC20Burnable, ERC20Permit {
         bool isExcludedFrom = _isExcludedFromFees[from];
         bool isExcludedTo = _isExcludedFromFees[to];
 
-        if (amount == 0) {
+        if (amount == 0 || isExcludedFrom || isExcludedTo) {
             super._transfer(from, to, 0);
             return;
         }
@@ -305,9 +305,7 @@ contract HampToken is ERC20, Ownable, ERC20Burnable, ERC20Permit {
             hasSufficientTokensForSwap &&
             swapEnabled &&
             !isSwapInProgress &&
-            !automatedMarketMakerPairs[from] &&
-            !isExcludedFrom &&
-            !isExcludedTo
+            !automatedMarketMakerPairs[from]
         ) {
             isSwapInProgress = true;
 
@@ -318,16 +316,10 @@ contract HampToken is ERC20, Ownable, ERC20Burnable, ERC20Permit {
 
         /// @dev Determines if fees should be applied to the current transfer
         /// Fees are not applied during swap operations to prevent double-charging
-        bool shouldApplyFees = !isSwapInProgress;
-
-        // if any account belongs to _isExcludedFromFee account then remove the fee
-        if (isExcludedFrom || isExcludedTo) {
-            shouldApplyFees = false;
-        }
 
         uint256 fees = 0;
         // only take fees on buys/sells, do not take on wallet transfers
-        if (shouldApplyFees) {
+        if (!isSwapInProgress) {
             // on sell
             if (automatedMarketMakerPairs[to] && sellTotalFees > 0) {
                 fees = calculateFee(amount, sellTotalFees);
@@ -356,9 +348,9 @@ contract HampToken is ERC20, Ownable, ERC20Burnable, ERC20Permit {
                 super._transfer(from, address(this), fees);
             }
 
-            amount -= fees;
         }
 
+            amount -= fees;
         super._transfer(from, to, amount);
     }
 

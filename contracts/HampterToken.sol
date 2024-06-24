@@ -16,6 +16,7 @@ import {IUniswapV2Factory} from "./interfaces/IUniswapV2Factory.sol";
 
 // https://www.playhampter.com/
 contract HampToken is ERC20, Ownable, ERC20Burnable, ERC20Permit {
+    using SafeMath for uint256;
     using SafeTransferLib for address payable;
 
     IUniswapV2Router02 public immutable uniswapV2Router;
@@ -30,7 +31,6 @@ contract HampToken is ERC20, Ownable, ERC20Burnable, ERC20Permit {
     address public revShareWallet;
     address public teamWallet;
 
-    uint256 public swapTokensAtAmount;
 
     bool public limitsInEffect = true;
     bool public tradingActive = false;
@@ -38,7 +38,10 @@ contract HampToken is ERC20, Ownable, ERC20Burnable, ERC20Permit {
 
     // Anti-bot and anti-whale mappings and variables
     mapping(address => bool) blacklisted;
-
+    
+    uint256 private constant FEE_PERCENTAGE_SCALE = 10000; // 100.00%
+    uint256 private constant MAX_SWAP_MULTIPLIER = 20; // Multiplier to cap the swap amonut of $HAMP in swapback
+    uint256 public swapTokensAtAmount;
     uint256 public buyTotalFees;
     uint256 public buyRevShareFee;
     uint256 public buyLiquidityFee;
@@ -53,7 +56,6 @@ contract HampToken is ERC20, Ownable, ERC20Burnable, ERC20Permit {
     uint256 public tokensForLiquidity;
     uint256 public tokensForTeam;
 
-    uint256 private constant MAX_SWAP_MULTIPLIER = 20;
 
     /******************/
 
@@ -110,13 +112,13 @@ contract HampToken is ERC20, Ownable, ERC20Burnable, ERC20Permit {
         _setAutomatedMarketMakerPair(address(uniswapV2Pair), true);
         uint256 totalSupply = 10_000_000 * 1e18; // 10 million tokens
 
-        uint256 _buyRevShareFee = 2; // 2% goes to the players of the game as rewards.
-        uint256 _buyLiquidityFee = 1; // 1% gets added back as liquidity provision to support the $HAMP economy.
-        uint256 _buyTeamFee = 1; // 1% goes to the developers of Hampter
+        uint256 _buyRevShareFee = 20; // 2% goes to the players of the game as rewards.
+        uint256 _buyLiquidityFee = 10; // 1% gets added back as liquidity provision to support the $HAMP economy.
+        uint256 _buyTeamFee = 10; // 1% goes to the developers of Hampter
 
-        uint256 _sellRevShareFee = 2; // 2% goes to the players of the game as rewards.
-        uint256 _sellLiquidityFee = 1; // 1% gets added back as liquidity provision to support the $HAMP economy.
-        uint256 _sellTeamFee = 1; // 1% goes to the developers of Hampter
+        uint256 _sellRevShareFee = 20; // 2% goes to the players of the game as rewards.
+        uint256 _sellLiquidityFee = 10; // 1% gets added back as liquidity provision to support the $HAMP economy.
+        uint256 _sellTeamFee = 10; // 1% goes to the developers of Hampter
 
         swapTokensAtAmount = (totalSupply * 5) / 10000; // 0.05% of total supply
 
@@ -192,7 +194,7 @@ contract HampToken is ERC20, Ownable, ERC20Burnable, ERC20Permit {
         buyLiquidityFee = _liquidityFee;
         buyTeamFee = _teamFee;
         buyTotalFees = buyRevShareFee + buyLiquidityFee + buyTeamFee;
-        require(buyTotalFees <= 5, "Buy fees must be <= 5.");
+        require(buyTotalFees <= 50, "Buy fees must be <= 50."); // 5%
     }
 
     function updateSellFees(
@@ -204,7 +206,7 @@ contract HampToken is ERC20, Ownable, ERC20Burnable, ERC20Permit {
         sellLiquidityFee = _liquidityFee;
         sellTeamFee = _teamFee;
         sellTotalFees = sellRevShareFee + sellLiquidityFee + sellTeamFee;
-        require(sellTotalFees <= 5, "Sell fees must be <= 5.");
+        require(sellTotalFees <= 50, "Sell fees must be <= 50."); // 5%
     }
 
     function excludeFromFees(address account, bool excluded) public onlyOwner {
@@ -270,6 +272,10 @@ contract HampToken is ERC20, Ownable, ERC20Burnable, ERC20Permit {
             );
         }
 
+        bool isExcludedFrom = _isExcludedFromFees[from];
+        bool isExcludedTo = _isExcludedFromFees[to];
+
+
         if (amount == 0) {
             super._transfer(from, to, 0);
             return;
@@ -285,7 +291,7 @@ contract HampToken is ERC20, Ownable, ERC20Burnable, ERC20Permit {
             ) {
                 if (!tradingActive) {
                     require(
-                        _isExcludedFromFees[from] || _isExcludedFromFees[to],
+                        isExcludedFrom || isExcludedTo,
                         "Trading is not active."
                     );
                 }
@@ -303,8 +309,8 @@ contract HampToken is ERC20, Ownable, ERC20Burnable, ERC20Permit {
             swapEnabled &&
             !isSwapInProgress &&
             !automatedMarketMakerPairs[from] &&
-            !_isExcludedFromFees[from] &&
-            !_isExcludedFromFees[to]
+            !isExcludedFrom &&
+            !isExcludedTo
         ) {
             isSwapInProgress = true;
 
@@ -318,7 +324,7 @@ contract HampToken is ERC20, Ownable, ERC20Burnable, ERC20Permit {
         bool shouldApplyFees = !isSwapInProgress;
 
         // if any account belongs to _isExcludedFromFee account then remove the fee
-        if (_isExcludedFromFees[from] || _isExcludedFromFees[to]) {
+        if (isExcludedFrom || isExcludedTo) {
             shouldApplyFees = false;
         }
 
@@ -327,7 +333,8 @@ contract HampToken is ERC20, Ownable, ERC20Burnable, ERC20Permit {
         if (shouldApplyFees) {
             // on sell
             if (automatedMarketMakerPairs[to] && sellTotalFees > 0) {
-                fees = (amount * sellTotalFees) / 100;
+                fees = calculateFee(amount, sellTotalFees);
+
                 _accountForFees(
                     fees,
                     sellLiquidityFee,
@@ -338,7 +345,7 @@ contract HampToken is ERC20, Ownable, ERC20Burnable, ERC20Permit {
             }
             // on buy
             else if (automatedMarketMakerPairs[from] && buyTotalFees > 0) {
-                fees = (amount * buyTotalFees) / 100; // NOTE: Is this correct?
+                fees = calculateFee(amount, buyTotalFees);
                 _accountForFees(
                     fees,
                     buyLiquidityFee,
@@ -503,6 +510,10 @@ contract HampToken is ERC20, Ownable, ERC20Burnable, ERC20Permit {
     ) public onlyOwner {
         preMigrationTransferrable[_addr] = isAuthorized;
         excludeFromFees(_addr, isAuthorized);
+    }
+
+    function calculateFee(uint256 amount, uint256 feePercentage) internal pure returns (uint256) {
+        return amount.mul(feePercentage).div(FEE_PERCENTAGE_SCALE);
     }
 
     receive() external payable {}

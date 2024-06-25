@@ -9,6 +9,7 @@ import {
   IWETH,
 } from "../typechain-types";
 import { Contract } from "ethers";
+import { hampterTokenSol } from "../typechain-types/contracts";
 
 const MAINNET_RPC_URL =
   process.env.MAINNET_RPC_URL || "https://eth.llamarpc.com";
@@ -138,75 +139,8 @@ describe("HampToken", function () {
       ethers.formatEther(await hampToken.balanceOf(owner.address))
     );
 
-    await hampToken.enableTrading();
-    // Try a simple transfer
-    try {
-      await hampToken.transfer(addr1.address, ethers.parseEther("1000"));
-      console.log("Transfer successful");
-      console.log(
-        "Owner balance after transfer:",
-        ethers.formatEther(await hampToken.balanceOf(owner.address))
-      );
-      console.log(
-        "Addr1 balance after transfer:",
-        ethers.formatEther(await hampToken.balanceOf(addr1.address))
-      );
-    } catch (error) {
-      console.error("Error during transfer:", error);
-    }
-
     // Enable trading
-
-    // Check balances before adding liquidity
-    const ownerEthBalance = await ethers.provider.getBalance(owner.address);
-    const ownerTokenBalance = await hampToken.balanceOf(owner.address);
-    console.log("Owner ETH balance:", ethers.formatEther(ownerEthBalance));
-    console.log("Owner token balance:", ethers.formatEther(ownerTokenBalance));
-
-    // Approve a smaller amount for liquidity
-    const liquidityTokenAmount = ethers.parseEther("100000"); // 100,000 tokens
-    const liquidityEthAmount = ethers.parseEther("10"); // 10 ETH
-
-    await hampToken.approve(
-      await uniswapRouter.getAddress(),
-      liquidityTokenAmount
-    );
-    console.log(
-      "Approved tokens for liquidity:",
-      ethers.formatEther(liquidityTokenAmount)
-    );
-
-    // Add initial liquidity with lower amounts
-    try {
-      const tx = await uniswapRouter.addLiquidityETH(
-        hampTokenAddress,
-        liquidityTokenAmount,
-        0, // slippage is unavoidable
-        0, // slippage is unavoidable
-        owner.address,
-        (await time.latest()) + 3600,
-        { value: liquidityEthAmount }
-      );
-      await tx.wait();
-      console.log("Liquidity added successfully");
-    } catch (error) {
-      console.error("Error adding liquidity:", error);
-      throw error;
-    }
-
-    // Check balances after adding liquidity
-    const finalOwnerEthBalance = await ethers.provider.getBalance(
-      owner.address
-    );
-    const finalOwnerTokenBalance = await hampToken.balanceOf(owner.address);
-    console.log(
-      "Final owner ETH balance:",
-      ethers.formatEther(finalOwnerEthBalance)
-    );
-    console.log(
-      "Final owner token balance:",
-      ethers.formatEther(finalOwnerTokenBalance)
-    );
+    await hampToken.enableTrading();
 
     return {
       hampToken,
@@ -254,6 +188,51 @@ describe("HampToken", function () {
   });
 
   describe("Fee Taxing", function () {
+    // Add liquidity to the pair
+    before(async function () {
+      console.log("Pair address:", pair);
+      console.log("HampToken address:", hampTokenAddress);
+      console.log("Owner address:", owner.address);
+      // Check balances before adding liquidity
+      const ownerEthBalance = await ethers.provider.getBalance(owner.address);
+      const ownerTokenBalance = await hampToken.balanceOf(owner.address);
+      console.log("Owner ETH balance:", ethers.formatEther(ownerEthBalance));
+      console.log(
+        "Owner token balance:",
+        ethers.formatEther(ownerTokenBalance)
+      );
+
+      // Approve a smaller amount for liquidity
+      const liquidityTokenAmount = ethers.parseEther("100000"); // 100,000 tokens
+      const liquidityEthAmount = ethers.parseEther("10"); // 10 ETH
+
+      await hampToken.approve(
+        await uniswapRouter.getAddress(),
+        liquidityTokenAmount
+      );
+
+      // Add initial liquidity with lower amounts
+      try {
+        const tx = await hampToken._addLiquidity(
+          hampTokenAddress,
+          liquidityTokenAmount,
+          0, // slippage is unavoidable
+          0, // slippage is unavoidable
+          owner.getAddress(),
+          (await time.latest()) + 3600,
+          { value: liquidityEthAmount }
+        );
+        await tx.wait();
+        console.log("Liquidity added successfully");
+      } catch (error) {
+        console.error("Error adding liquidity:", error);
+        throw error;
+      }
+      // Check LP token balance
+      const lpTokenBalance = await hampToken.balanceOf(pair);
+      console.log("LP token balance:", ethers.formatEther(lpTokenBalance));
+    });
+
     it("Should apply buy fees correctly", async function () {
       const initialContractBalance =
         await hampToken.balanceOf(hampTokenAddress);
@@ -319,11 +298,64 @@ describe("HampToken", function () {
       await hampToken.transfer(addr1.address, transferAmount);
 
       const finalBalance = await hampToken.balanceOf(addr1.address);
-      expect(finalBalance.sub(initialBalance)).to.equal(transferAmount);
+      expect(finalBalance - initialBalance).to.equal(transferAmount);
     });
   });
 
   describe("Swap Back", function () {
+    // Add liquidity to the pair
+    before(async function () {
+      // Check balances before adding liquidity
+      const ownerEthBalance = await ethers.provider.getBalance(owner.address);
+      const ownerTokenBalance = await hampToken.balanceOf(owner.address);
+      console.log("Owner ETH balance:", ethers.formatEther(ownerEthBalance));
+      console.log(
+        "Owner token balance:",
+        ethers.formatEther(ownerTokenBalance)
+      );
+
+      // Approve a smaller amount for liquidity
+      const liquidityTokenAmount = ethers.parseEther("100000"); // 100,000 tokens
+      const liquidityEthAmount = ethers.parseEther("10"); // 10 ETH
+
+      await hampToken.approve(
+        await uniswapRouter.getAddress(),
+        liquidityTokenAmount
+      );
+
+      // Add initial liquidity with lower amounts
+      try {
+        const tx = await uniswapRouter.addLiquidityETH(
+          hampTokenAddress,
+          liquidityTokenAmount,
+          0, // slippage is unavoidable
+          0, // slippage is unavoidable
+          owner.address,
+          (await time.latest()) + 3600,
+          { value: liquidityEthAmount }
+        );
+        await tx.wait();
+        console.log("Liquidity added successfully");
+      } catch (error) {
+        console.error("Error adding liquidity:", error);
+        throw error;
+      }
+
+      // Check balances after adding liquidity
+      const finalOwnerEthBalance = await ethers.provider.getBalance(
+        owner.address
+      );
+      const finalOwnerTokenBalance = await hampToken.balanceOf(owner.address);
+      console.log(
+        "Final owner ETH balance:",
+        ethers.formatEther(finalOwnerEthBalance)
+      );
+      console.log(
+        "Final owner token balance:",
+        ethers.formatEther(finalOwnerTokenBalance)
+      );
+    });
+
     it("Should perform swap back when threshold is met", async function () {
       const initialTeamBalance = await ethers.provider.getBalance(
         teamWallet.address

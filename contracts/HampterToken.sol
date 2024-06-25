@@ -371,6 +371,7 @@ contract HampToken is ERC20, Ownable, ERC20Burnable, ERC20Permit {
      * 2. ETH for ecosystem development - 2%
      * 3. ETH for PVE and PVP rewards - 2%
      * The Swap happens when the contract accrues more than 500 $HAM tokens.
+     * Swap back happens only on normal transfers and not on buy/sell transactions.
      */
     function _swapBack() private {
         uint256 contractBalance = balanceOf(address(this));

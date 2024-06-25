@@ -466,7 +466,7 @@ describe("HampToken", function () {
       // Perform multiple buys and sells to accumulate fees
       let contractBalance = BigInt(0);
       while (contractBalance < swapThreshold) {
-        await buyTokens(ethers.parseEther("10"), addr2);
+        await buyTokens(ethers.parseEther("100"), addr2);
         await sellTokens(addr2);
         contractBalance = await newToken.balanceOf(newTokenAddress);
       }
@@ -478,6 +478,10 @@ describe("HampToken", function () {
       // Trigger a transfer to initiate swap back
       await newToken
         .connect(owner)
+        .transfer(addr1.address, ethers.parseEther("1"));
+
+      await newToken
+        .connect(addr1)
         .transfer(addr3.address, ethers.parseEther("1"));
 
       const finalTeamBalance = await ethers.provider.getBalance(
@@ -582,21 +586,36 @@ describe("HampToken", function () {
 
     it("Should add liquidity during swap back", async function () {
       const swapThreshold = await newToken.swapTokensAtAmount();
-      const initialPairBalance = await newToken.balanceOf(
-        await uniswapRouter.WETH()
+      const pairAddress = await newToken.uniswapV2Pair();
+
+      // Get the LP token contract
+      const lpTokenContract = new ethers.Contract(
+        pairAddress,
+        ["function balanceOf(address) view returns (uint256)"],
+        ethers.provider
       );
+
+      const initialLPBalance = await lpTokenContract.balanceOf(newTokenAddress);
+      console.log(
+        `Initial LP Token Balance of Contract: ${ethers.formatEther(initialLPBalance)} LP`
+      );
+
+      console.log(`Swap Threshold: ${ethers.formatEther(swapThreshold)} HAMP`);
 
       // Perform multiple buys and sells to accumulate fees
       let contractBalance = BigInt(0);
-      while (contractBalance < swapThreshold) {
+      let iterations = 0;
+      while (contractBalance < swapThreshold && iterations < 20) {
         await buyTokens(ethers.parseEther("10"), addr2);
         await sellTokens(addr2);
         contractBalance = await newToken.balanceOf(newTokenAddress);
+        iterations++;
       }
 
       console.log(
-        `Contract balance: ${contractBalance}, Swap threshold: ${swapThreshold}`
+        `Contract HAMP balance after trades: ${ethers.formatEther(contractBalance)} HAMP`
       );
+      console.log(`Number of buy/sell iterations: ${iterations}`);
 
       expect(contractBalance).to.be.gte(
         swapThreshold,
@@ -608,11 +627,60 @@ describe("HampToken", function () {
         .connect(owner)
         .transfer(addr3.address, ethers.parseEther("1"));
 
-      const finalPairBalance = await newToken.balanceOf(
-        await uniswapRouter.WETH()
+      // Check the final LP token balance
+      const finalLPBalance = await lpTokenContract.balanceOf(newTokenAddress);
+      console.log(
+        `Final LP Token Balance of Contract: ${ethers.formatEther(finalLPBalance)} LP`
       );
-      expect(isSignificantChange(initialPairBalance, finalPairBalance, 0.1)).to
-        .be.true;
+
+      // Check if LP tokens were added to the contract
+      if (initialLPBalance === 0n) {
+        expect(finalLPBalance).to.be.gt(
+          0n,
+          "LP token balance should increase from zero"
+        );
+        console.log(
+          `LP tokens added: ${ethers.formatEther(finalLPBalance)} LP`
+        );
+      } else {
+        const lpTokenIncrease = finalLPBalance - initialLPBalance;
+        const percentageIncrease =
+          Number((lpTokenIncrease * 10000n) / initialLPBalance) / 100;
+        console.log(
+          `LP tokens added: ${ethers.formatEther(lpTokenIncrease)} LP`
+        );
+        console.log(
+          `Percentage increase in LP token balance: ${percentageIncrease}%`
+        );
+        expect(percentageIncrease).to.be.gt(
+          0,
+          "LP token balance should increase"
+        );
+      }
+
+      // Additional checks
+      const contractHAMPBalance = await newToken.balanceOf(newTokenAddress);
+      console.log(
+        `Final Contract HAMP Balance: ${ethers.formatEther(contractHAMPBalance)} HAMP`
+      );
+
+      const contractETHBalance =
+        await ethers.provider.getBalance(newTokenAddress);
+      console.log(
+        `Final Contract ETH Balance: ${ethers.formatEther(contractETHBalance)} ETH`
+      );
+
+      // Check if the contract's HAMP balance decreased (some was used for liquidity)
+      expect(contractHAMPBalance).to.be.lt(
+        contractBalance,
+        "Contract's HAMP balance should decrease after adding liquidity"
+      );
+
+      // Check if the contract's ETH balance is close to zero (most should have been used for liquidity or distributed)
+      expect(contractETHBalance).to.be.lt(
+        ethers.parseEther("0.1"),
+        "Contract's ETH balance should be close to zero after swap and liquidity addition"
+      );
     });
   });
 

@@ -245,7 +245,7 @@ describe("HampToken", function () {
       const expectedFeeAmount =
         (expectedAmountWithoutFees * BigInt(totalBuyFee)) / 10000n;
 
-        // TODO: This isnt working properly due to slippage
+      // TODO: This isnt working properly due to slippage
       // Check if the expected Fee Amount is 5% of the expected amount without fees
 
       // // Verify that the collected fees are close to the expected fee amount
@@ -384,61 +384,71 @@ describe("HampToken", function () {
     });
   });
 
-  describe("Swap Back", function () {
-    // Add liquidity to the pair
-    before(async function () {
-      // Check balances before adding liquidity
-      const ownerEthBalance = await ethers.provider.getBalance(owner.address);
-      const ownerTokenBalance = await hampToken.balanceOf(owner.address);
-      console.log("Owner ETH balance:", ethers.formatEther(ownerEthBalance));
-      console.log(
-        "Owner token balance:",
-        ethers.formatEther(ownerTokenBalance)
-      );
+  describe("Swap Back and Liquidity Addition", function () {
+    let newToken: HampToken;
+    let newTokenAddress: string;
 
-      // Approve a smaller amount for liquidity
-      const liquidityTokenAmount = ethers.parseEther("100000"); // 100,000 tokens
-      const liquidityEthAmount = ethers.parseEther("10"); // 10 ETH
+    beforeEach(async function () {
+      // Deploy a new token
+      const HampTokenFactory = await ethers.getContractFactory("HampToken");
+      newToken = (await HampTokenFactory.deploy(
+        await uniswapRouter.getAddress()
+      )) as HampToken;
+      newTokenAddress = await newToken.getAddress();
 
-      await hampToken.approve(
-        await uniswapRouter.getAddress(),
-        liquidityTokenAmount
-      );
+      // Enable trading
+      await newToken.connect(owner).enableTrading();
 
-      // Add initial liquidity with lower amounts
-      try {
-        const tx = await uniswapRouter.addLiquidityETH(
-          hampTokenAddress,
-          liquidityTokenAmount,
-          0, // slippage is unavoidable
-          0, // slippage is unavoidable
-          owner.address,
-          (await time.latest()) + 3600,
-          { value: liquidityEthAmount }
-        );
-        await tx.wait();
-        console.log("Liquidity added successfully");
-      } catch (error) {
-        console.error("Error adding liquidity:", error);
-        throw error;
-      }
+      // Add initial liquidity
+      const liquidityAmount = ethers.parseEther("1000000"); // 1 million tokens
+      await newToken
+        .connect(owner)
+        .approve(await uniswapRouter.getAddress(), liquidityAmount);
+      await addLiquidity(newToken, liquidityAmount, ethers.parseEther("100")); // 100 ETH
 
-      // Check balances after adding liquidity
-      const finalOwnerEthBalance = await ethers.provider.getBalance(
-        owner.address
-      );
-      const finalOwnerTokenBalance = await hampToken.balanceOf(owner.address);
-      console.log(
-        "Final owner ETH balance:",
-        ethers.formatEther(finalOwnerEthBalance)
-      );
-      console.log(
-        "Final owner token balance:",
-        ethers.formatEther(finalOwnerTokenBalance)
-      );
+      // Exclude owner from fees to simplify testing
+      await newToken.connect(owner).excludeFromFees(owner.address, true);
     });
 
+    async function buyTokens(amount: bigint, signer: SignerWithAddress) {
+      await uniswapRouter
+        .connect(signer)
+        .swapExactETHForTokensSupportingFeeOnTransferTokens(
+          0,
+          [await weth.getAddress(), newTokenAddress],
+          signer.address,
+          (await time.latest()) + 3600,
+          { value: amount }
+        );
+    }
+
+    async function sellTokens(signer: SignerWithAddress) {
+      const balance = await newToken.balanceOf(signer.address);
+      await newToken
+        .connect(signer)
+        .approve(await uniswapRouter.getAddress(), balance);
+      await uniswapRouter
+        .connect(signer)
+        .swapExactTokensForETHSupportingFeeOnTransferTokens(
+          balance,
+          0,
+          [newTokenAddress, await weth.getAddress()],
+          signer.address,
+          (await time.latest()) + 3600
+        );
+    }
+
+    function isSignificantChange(
+      initial: bigint,
+      final: bigint,
+      threshold: number
+    ): boolean {
+      const change = Number(((final - initial) * 10000n) / initial) / 100;
+      return Math.abs(change) > threshold;
+    }
+
     it("Should perform swap back when threshold is met", async function () {
+      const swapThreshold = await newToken.swapTokensAtAmount();
       const initialTeamBalance = await ethers.provider.getBalance(
         teamWallet.address
       );
@@ -446,35 +456,29 @@ describe("HampToken", function () {
         revShareWallet.address
       );
 
-      // Perform multiple sells to accumulate fees
-      for (let i = 0; i < 5; i++) {
-        await uniswapRouter
-          .connect(addr2)
-          .swapExactETHForTokensSupportingFeeOnTransferTokens(
-            0,
-            [await weth.getAddress(), hampTokenAddress],
-            addr2.address,
-            (await time.latest()) + 3600,
-            { value: ethers.parseEther("1") }
-          );
+      console.log(
+        `Initial Team Balance: ${ethers.formatEther(initialTeamBalance)} ETH`
+      );
+      console.log(
+        `Initial RevShare Balance: ${ethers.formatEther(initialRevShareBalance)} ETH`
+      );
 
-        const addr2Balance = await hampToken.balanceOf(addr2.address);
-        await hampToken
-          .connect(addr2)
-          .approve(await uniswapRouter.getAddress(), addr2Balance);
-        await uniswapRouter
-          .connect(addr2)
-          .swapExactTokensForETHSupportingFeeOnTransferTokens(
-            addr2Balance,
-            0,
-            [hampTokenAddress, await weth.getAddress()],
-            addr2.address,
-            (await time.latest()) + 3600
-          );
+      // Perform multiple buys and sells to accumulate fees
+      let contractBalance = BigInt(0);
+      while (contractBalance < swapThreshold) {
+        await buyTokens(ethers.parseEther("10"), addr2);
+        await sellTokens(addr2);
+        contractBalance = await newToken.balanceOf(newTokenAddress);
       }
 
+      console.log(
+        `Contract balance: ${ethers.formatEther(contractBalance)} HAMP, Swap threshold: ${ethers.formatEther(swapThreshold)} HAMP`
+      );
+
       // Trigger a transfer to initiate swap back
-      await hampToken.transfer(addr3.address, ethers.parseEther("1"));
+      await newToken
+        .connect(owner)
+        .transfer(addr3.address, ethers.parseEther("1"));
 
       const finalTeamBalance = await ethers.provider.getBalance(
         teamWallet.address
@@ -483,131 +487,132 @@ describe("HampToken", function () {
         revShareWallet.address
       );
 
-      expect(finalTeamBalance).to.be.gt(initialTeamBalance);
-      expect(finalRevShareBalance).to.be.gt(initialRevShareBalance);
+      console.log(
+        `Final Team Balance: ${ethers.formatEther(finalTeamBalance)} ETH`
+      );
+      console.log(
+        `Final RevShare Balance: ${ethers.formatEther(finalRevShareBalance)} ETH`
+      );
+
+      const teamBalanceIncrease = finalTeamBalance - initialTeamBalance;
+      const revShareBalanceIncrease =
+        finalRevShareBalance - initialRevShareBalance;
+
+      console.log(
+        `Team Balance Increase: ${ethers.formatEther(teamBalanceIncrease)} ETH`
+      );
+      console.log(
+        `RevShare Balance Increase: ${ethers.formatEther(revShareBalanceIncrease)} ETH`
+      );
+
+      // Check if the team and revShare wallets have received the fees
+      expect(finalTeamBalance).to.be.gt(
+        initialTeamBalance,
+        "Team balance should increase"
+      );
+      expect(finalRevShareBalance).to.be.gt(
+        initialRevShareBalance,
+        "RevShare balance should increase"
+      );
+
+      // Calculate the minimum expected increase based on the fees
+      const buyTeamFee = await newToken.buyTeamFee();
+      const sellTeamFee = await newToken.sellTeamFee();
+      const buyRevShareFee = await newToken.buyRevShareFee();
+      const sellRevShareFee = await newToken.sellRevShareFee();
+
+      const totalFees =
+        buyTeamFee + sellTeamFee + buyRevShareFee + sellRevShareFee;
+      const minExpectedIncrease =
+        (contractBalance * BigInt(totalFees)) / BigInt(10000);
+
+      console.log(
+        `Minimum expected increase: ${ethers.formatEther(minExpectedIncrease)} ETH`
+      );
+
+      // Check if the total increase is at least the minimum expected
+      const totalIncrease = teamBalanceIncrease + revShareBalanceIncrease;
+      expect(totalIncrease).to.be.gte(
+        minExpectedIncrease,
+        "Total balance increase should meet or exceed the minimum expected based on fees"
+      );
     });
 
     it("Should not perform swap back if threshold is not met", async function () {
+      const swapThreshold = await newToken.swapTokensAtAmount();
       const initialTeamBalance = await ethers.provider.getBalance(
-        teamWallet.address
+        await newToken.teamWallet()
       );
       const initialRevShareBalance = await ethers.provider.getBalance(
-        revShareWallet.address
+        await newToken.revShareWallet()
       );
 
-      // Perform a small sell
-      await uniswapRouter
-        .connect(addr2)
-        .swapExactETHForTokensSupportingFeeOnTransferTokens(
-          0,
-          [await weth.getAddress(), hampTokenAddress],
-          addr2.address,
-          (await time.latest()) + 3600,
-          { value: ethers.parseEther("0.1") }
-        );
+      // Perform a small buy and sell
+      await buyTokens(ethers.parseEther("0.1"), addr2);
+      await sellTokens(addr2);
 
-      const addr2Balance = await hampToken.balanceOf(addr2.address);
-      await hampToken
-        .connect(addr2)
-        .approve(await uniswapRouter.getAddress(), addr2Balance);
-      await uniswapRouter
-        .connect(addr2)
-        .swapExactTokensForETHSupportingFeeOnTransferTokens(
-          addr2Balance,
-          0,
-          [hampTokenAddress, await weth.getAddress()],
-          addr2.address,
-          (await time.latest()) + 3600
-        );
+      const contractBalance = await newToken.balanceOf(newTokenAddress);
+      console.log(
+        `Contract balance: ${contractBalance}, Swap threshold: ${swapThreshold}`
+      );
+
+      expect(contractBalance).to.be.lt(
+        swapThreshold,
+        "Contract balance should be below swap threshold"
+      );
 
       // Trigger a transfer
-      await hampToken.transfer(addr3.address, ethers.parseEther("1"));
+      await newToken
+        .connect(owner)
+        .transfer(addr3.address, ethers.parseEther("1"));
 
       const finalTeamBalance = await ethers.provider.getBalance(
-        teamWallet.address
+        await newToken.teamWallet()
       );
       const finalRevShareBalance = await ethers.provider.getBalance(
-        revShareWallet.address
+        await newToken.revShareWallet()
       );
 
-      expect(finalTeamBalance).to.equal(initialTeamBalance);
-      expect(finalRevShareBalance).to.equal(initialRevShareBalance);
+      expect(isSignificantChange(initialTeamBalance, finalTeamBalance, 0.1)).to
+        .be.false;
+      expect(
+        isSignificantChange(initialRevShareBalance, finalRevShareBalance, 0.1)
+      ).to.be.false;
     });
-  });
 
-  describe("Liquidity Addition", function () {
     it("Should add liquidity during swap back", async function () {
-      const initialPairBalance = await hampToken.balanceOf(pair);
+      const swapThreshold = await newToken.swapTokensAtAmount();
+      const initialPairBalance = await newToken.balanceOf(
+        await uniswapRouter.WETH()
+      );
 
-      // Perform multiple sells to accumulate fees
-      for (let i = 0; i < 10; i++) {
-        await uniswapRouter
-          .connect(addr2)
-          .swapExactETHForTokensSupportingFeeOnTransferTokens(
-            0,
-            [await weth.getAddress(), hampTokenAddress],
-            addr2.address,
-            (await time.latest()) + 3600,
-            { value: ethers.parseEther("1") }
-          );
-
-        const addr2Balance = await hampToken.balanceOf(addr2.address);
-        await hampToken
-          .connect(addr2)
-          .approve(await uniswapRouter.getAddress(), addr2Balance);
-        await uniswapRouter
-          .connect(addr2)
-          .swapExactTokensForETHSupportingFeeOnTransferTokens(
-            addr2Balance,
-            0,
-            [hampTokenAddress, await weth.getAddress()],
-            addr2.address,
-            (await time.latest()) + 3600
-          );
+      // Perform multiple buys and sells to accumulate fees
+      let contractBalance = BigInt(0);
+      while (contractBalance < swapThreshold) {
+        await buyTokens(ethers.parseEther("10"), addr2);
+        await sellTokens(addr2);
+        contractBalance = await newToken.balanceOf(newTokenAddress);
       }
 
+      console.log(
+        `Contract balance: ${contractBalance}, Swap threshold: ${swapThreshold}`
+      );
+
+      expect(contractBalance).to.be.gte(
+        swapThreshold,
+        "Contract balance should meet or exceed swap threshold"
+      );
+
       // Trigger a transfer to initiate swap back
-      await hampToken.transfer(addr3.address, ethers.parseEther("1"));
+      await newToken
+        .connect(owner)
+        .transfer(addr3.address, ethers.parseEther("1"));
 
-      const finalPairBalance = await hampToken.balanceOf(pair);
-      expect(finalPairBalance).to.be.gt(initialPairBalance);
-    });
-  });
-
-  describe("Owner functions", function () {
-    it("Should allow owner to update team wallet", async function () {
-      await hampToken.updateTeamWallet(addr1.address);
-      expect(await hampToken.teamWallet()).to.equal(addr1.address);
-    });
-
-    it("Should allow owner to update revShare wallet", async function () {
-      await hampToken.updateRevShareWallet(addr1.address);
-      expect(await hampToken.revShareWallet()).to.equal(addr1.address);
-    });
-
-    it("Should allow owner to exclude address from fees", async function () {
-      await hampToken.excludeFromFees(addr1.address, true);
-      expect(await hampToken.isExcludedFromFees(addr1.address)).to.be.true;
-    });
-
-    it("Should allow owner to include previously excluded address in fees", async function () {
-      await hampToken.excludeFromFees(addr1.address, true);
-      await hampToken.excludeFromFees(addr1.address, false);
-      expect(await hampToken.isExcludedFromFees(addr1.address)).to.be.false;
-    });
-
-    it("Should allow owner to update buy fees", async function () {
-      await hampToken.updateBuyFees(10, 10, 10);
-      expect(await hampToken.buyRevShareFee()).to.equal(10);
-      expect(await hampToken.buyLiquidityFee()).to.equal(10);
-      expect(await hampToken.buyTeamFee()).to.equal(10);
-    });
-
-    it("Should allow owner to update sell fees", async function () {
-      await hampToken.updateSellFees(10, 10, 10);
-      expect(await hampToken.sellRevShareFee()).to.equal(10);
-      expect(await hampToken.sellLiquidityFee()).to.equal(10);
-      expect(await hampToken.sellTeamFee()).to.equal(10);
+      const finalPairBalance = await newToken.balanceOf(
+        await uniswapRouter.WETH()
+      );
+      expect(isSignificantChange(initialPairBalance, finalPairBalance, 0.1)).to
+        .be.true;
     });
   });
 

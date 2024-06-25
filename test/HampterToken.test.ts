@@ -84,9 +84,12 @@ describe("HampToken", function () {
     };
   }
 
-  async function addLiquidity(token: HampToken, amount: bigint) {
-    const liquidityTokenAmount = amount;
-    const liquidityEthAmount = ethers.parseEther("10");
+  async function addLiquidity(
+    token: HampToken,
+    tokenAmount: bigint,
+    liquidityEthAmount = ethers.parseEther("10")
+  ) {
+    const liquidityTokenAmount = tokenAmount;
 
     await token.approve(await uniswapRouter.getAddress(), liquidityTokenAmount);
 
@@ -528,24 +531,7 @@ describe("HampToken", function () {
         await ethers.getContractFactory("HampToken")
       ).deploy(UNISWAP_ROUTER_ADDRESS)) as HampToken;
 
-      // Add liquidity to the new token
-      const liquidityTokenAmount = ethers.parseEther("100000");
-      const liquidityEthAmount = ethers.parseEther("10");
-
-      await newToken.approve(
-        await uniswapRouter.getAddress(),
-        liquidityTokenAmount
-      );
-
-      await uniswapRouter.addLiquidityETH(
-        await newToken.getAddress(),
-        liquidityTokenAmount,
-        0,
-        0,
-        owner.address,
-        (await time.latest()) + 3600,
-        { value: liquidityEthAmount }
-      );
+      await addLiquidity(newToken, ethers.parseEther("100000"));
 
       await expect(
         uniswapRouter
@@ -590,21 +576,7 @@ describe("HampToken", function () {
       expect(contractBalanceAfterTransfer).to.equal(0n);
 
       // Now let's simulate a trade (buy) to check if fees are applied
-      // First, we need to add liquidity
-      const liquidityTokenAmount = ethers.parseEther("100000");
-      const liquidityEthAmount = ethers.parseEther("10");
-
-      await newToken.approve(uniswapRouterAddress, liquidityTokenAmount);
-
-      await uniswapRouter.addLiquidityETH(
-        newTokenAddress,
-        liquidityTokenAmount,
-        0,
-        0,
-        owner.address,
-        (await ethers.provider.getBlock("latest")).timestamp + 3600,
-        { value: liquidityEthAmount }
-      );
+      await addLiquidity(newToken, ethers.parseEther("100000"));
 
       // Now perform a swap (buy tokens)
       const buyAmount = ethers.parseEther("1");

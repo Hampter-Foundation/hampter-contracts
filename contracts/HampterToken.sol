@@ -393,14 +393,13 @@ contract HampToken is ERC20, Ownable, ERC20Burnable, ERC20Permit {
             return;
         }
 
-    //     // TODO: REmove
-    //     if (contractBalance == 0 ) {
-    //         console.log("No tokens to swap, returning");
-    //         return;
-    //     }
-    //    // TODO: REmove
-    //     totalTokensToSwap = 5000 ether;
-
+        //     // TODO: REmove
+        //     if (contractBalance == 0 ) {
+        //         console.log("No tokens to swap, returning");
+        //         return;
+        //     }
+        //    // TODO: REmove
+        //     totalTokensToSwap = 5000 ether;
 
         // Cap the swap amount to prevent price impact and ensure more frequent, smaller swaps
         if (contractBalance > swapTokensAtAmount * MAX_SWAP_MULTIPLIER) {
@@ -426,7 +425,6 @@ contract HampToken is ERC20, Ownable, ERC20Burnable, ERC20Permit {
 
         uint256 ethBalance = address(this).balance - initialETHBalance;
         console.log("ETH received from swap: %s", ethBalance);
-
 
         // Calculate ETH distribution
         uint256 actualTokensSwapped = totalTokensToSwap -
@@ -530,7 +528,7 @@ contract HampToken is ERC20, Ownable, ERC20Burnable, ERC20Permit {
             tokenAmount,
             0, // slippage is unavoidable
             0, // slippage is unavoidable
-            owner(),
+            owner(), // LP tokens sent to owner
             block.timestamp
         );
     }
@@ -578,6 +576,7 @@ contract HampToken is ERC20, Ownable, ERC20Burnable, ERC20Permit {
         return amount.mul(feePercentage).div(FEE_PERCENTAGE_SCALE);
     }
 
+    /// @dev Manual swap back is for emergency use only
     function manualSwapBack() external onlyOwner {
         require(swapEnabled, "Swap is not enabled");
         require(!isSwapInProgress, "Swap is already in progress");

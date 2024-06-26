@@ -14,9 +14,6 @@ import {SafeTransferLib} from "./lib/solmate/src/utils/SafeTransferLib.sol";
 import {IUniswapV2Router02} from "./interfaces/IUniswapV2Router02.sol";
 import {IUniswapV2Factory} from "./interfaces/IUniswapV2Factory.sol";
 
-//TODO: Remove console.log before deployment
-import "hardhat/console.sol";
-
 // https://www.playhampter.com/
 contract HampToken is ERC20, Ownable, ERC20Burnable, ERC20Permit {
     using SafeMath for uint256;
@@ -373,91 +370,54 @@ contract HampToken is ERC20, Ownable, ERC20Burnable, ERC20Permit {
      * 2. ETH for ecosystem development - 2%
      * 3. ETH for PVE and PVP rewards - 2%
      * The Swap happens when the contract accrues more than 500 $HAM tokens.
-     * TODO: REMOVE CONSOLE.LOG
      */
     function _swapBack() private {
-        console.log("_swapBack function called");
         uint256 contractBalance = balanceOf(address(this));
         uint256 totalTokensToSwap = tokensForLiquidity +
             tokensForRevShare +
             tokensForTeam;
 
-        console.log(
-            "Contract balance: %s, Total tokens to swap: %s",
-            contractBalance,
-            totalTokensToSwap
-        );
-
         if (contractBalance == 0 || totalTokensToSwap == 0) {
-            console.log("No tokens to swap, returning");
             return;
         }
-
-        //     // TODO: REmove
-        //     if (contractBalance == 0 ) {
-        //         console.log("No tokens to swap, returning");
-        //         return;
-        //     }
-        //    // TODO: REmove
-        //     totalTokensToSwap = 5000 ether;
 
         // Cap the swap amount to prevent price impact and ensure more frequent, smaller swaps
         if (contractBalance > swapTokensAtAmount * MAX_SWAP_MULTIPLIER) {
             contractBalance = swapTokensAtAmount * MAX_SWAP_MULTIPLIER;
-            console.log("Swap amount capped to: %s", contractBalance);
         }
 
         // Calculate tokens for liquidity (halved)
         uint256 liquidityTokens = (contractBalance * tokensForLiquidity) /
             totalTokensToSwap /
             2;
-        console.log("Tokens for liquidity: %s", liquidityTokens);
 
         uint256 amountToSwapForETH = contractBalance - liquidityTokens;
-        console.log("Amount to swap for ETH: %s", amountToSwapForETH);
 
         uint256 initialETHBalance = address(this).balance;
-        console.log("Initial ETH balance: %s", initialETHBalance);
 
         _swapTokensForEth(amountToSwapForETH);
 
-        console.log("Contract ETH balance: %s", address(this).balance);
+        uint256 ethBalance = address(this).balance.sub(initialETHBalance);
 
-        uint256 ethBalance = address(this).balance - initialETHBalance;
-        console.log("ETH received from swap: %s", ethBalance);
-
-        // Calculate ETH distribution
-        uint256 actualTokensSwapped = totalTokensToSwap -
-            (tokensForLiquidity / 2);
-        console.log("Actual tokens swapped: %s", actualTokensSwapped);
-
-        uint256 ethForRevShare = (ethBalance * tokensForRevShare) /
-            actualTokensSwapped;
-        uint256 ethForTeam = (ethBalance * tokensForTeam) / actualTokensSwapped;
-        uint256 ethForLiquidity = ethBalance - ethForRevShare - ethForTeam;
-
-        console.log(
-            "ETH for RevShare: %s, ETH for Team: %s, ETH for Liquidity: %s",
-            ethForRevShare,
-            ethForTeam,
-            ethForLiquidity
+        uint256 ethForRevShare = ethBalance.mul(tokensForRevShare).div(
+            totalTokensToSwap - (tokensForLiquidity / 2)
         );
+
+        uint256 ethForTeam = ethBalance.mul(tokensForTeam).div(
+            totalTokensToSwap - (tokensForLiquidity / 2)
+        );
+
+        uint256 ethForLiquidity = ethBalance - ethForRevShare - ethForTeam;
 
         // Reset token accumulators after processing
         tokensForLiquidity = 0;
         tokensForRevShare = 0;
         tokensForTeam = 0;
 
-        console.log("Transferring %s ETH to team wallet", ethForTeam);
         payable(teamWallet).safeTransferETH(ethForTeam);
 
         // Adds Liquidity to LP
         if (liquidityTokens > 0 && ethForLiquidity > 0) {
-            console.log(
-                "Adding liquidity: %s tokens and %s ETH",
-                liquidityTokens,
-                ethForLiquidity
-            );
             _addLiquidity(liquidityTokens, ethForLiquidity);
             emit SwapAndLiquify(
                 amountToSwapForETH,
@@ -466,16 +426,7 @@ contract HampToken is ERC20, Ownable, ERC20Burnable, ERC20Permit {
             );
         }
 
-        console.log(
-            "Transferring remaining %s ETH to revShare wallet",
-            address(this).balance
-        );
         payable(revShareWallet).safeTransferETH(address(this).balance);
-
-        console.log("_swapBack function completed");
-        // check contract eth balance
-        console.log("Contract ETH balance: %s", address(this).balance);
-        console.log("--------------------------------------------------");
     }
 
     /// @dev Accounts for the increase in tokens for different purposes based on collected fees

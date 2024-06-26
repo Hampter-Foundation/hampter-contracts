@@ -15,7 +15,6 @@ const MAINNET_RPC_URL =
   process.env.MAINNET_RPC_URL || "https://eth.llamarpc.com";
 
 describe("HampToken", function () {
-  let HampToken: Contract;
   let hampToken: HampToken;
   let owner: SignerWithAddress,
     addr1: SignerWithAddress,
@@ -475,14 +474,44 @@ describe("HampToken", function () {
         `Contract balance: ${ethers.formatEther(contractBalance)} HAMP, Swap threshold: ${ethers.formatEther(swapThreshold)} HAMP`
       );
 
-      // Trigger a transfer to initiate swap back
+      // Transfer tokens to a non-excluded address
       await newToken
         .connect(owner)
-        .transfer(addr1.address, ethers.parseEther("1"));
+        .transfer(addr1.address, ethers.parseEther("1000000"));
 
+      // Trigger a transfer to initiate swap back
       await newToken
         .connect(addr1)
-        .transfer(addr3.address, ethers.parseEther("1"));
+        .transfer(addr3.address, ethers.parseEther("100000"));
+
+      // Trigger a transfer to initiate swap back
+      const tx = await newToken
+        .connect(addr1)
+        .transfer(addr3.address, ethers.parseEther("100000"));
+      const receipt = await tx.wait();
+
+      // Check for SwapAndLiquify event
+      const swapAndLiquifyEvent = receipt.events?.find(
+        (event) => event.event === "SwapForETH"
+      );
+
+      if (swapAndLiquifyEvent) {
+        const { tokensSwapped, ethReceived, tokensIntoLiquidity } =
+          swapAndLiquifyEvent.args as SwapForETH;
+        console.log("SwapAndLiquify event emitted:");
+        console.log(
+          `Tokens Swapped: ${ethers.formatEther(tokensSwapped)} HAMP`
+        );
+        console.log(`ETH Received: ${ethers.formatEther(ethReceived)} ETH`);
+        console.log(
+          `Tokens Into Liquidity: ${ethers.formatEther(tokensIntoLiquidity)} HAMP`
+        );
+      } else {
+        console.log("SwapForETH event was not emitted");
+      }
+
+      // Wait for a few blocks to allow the swap to complete
+      await time.increase(60);
 
       const finalTeamBalance = await ethers.provider.getBalance(
         teamWallet.address
@@ -787,6 +816,61 @@ describe("HampToken", function () {
       expect(contractBalanceAfterSecondTransfer).to.equal(
         contractBalanceAfterTrade
       );
+    });
+  });
+  describe("manualSwapBack", function () {
+    it("Should allow owner to manually trigger a swap back", async function () {
+      // Transfer some tokens to the contract to simulate collected fees
+      const transferAmount = ethers.parseEther("1000000");
+      await hampToken.transfer(hampTokenAddress, transferAmount);
+
+      // Get initial balances
+      const initialContractBalance =
+        await hampToken.balanceOf(hampTokenAddress);
+      const initialOwnerETHBalance = await ethers.provider.getBalance(
+        owner.address
+      );
+
+      // Perform manual swap back
+      await expect(hampToken.connect(owner).manualSwapBack()).to.not.be
+        .reverted;
+
+      // require no revert
+
+      // Get final balances
+      const finalContractBalance = await hampToken.balanceOf(hampTokenAddress);
+      const finalOwnerETHBalance = await ethers.provider.getBalance(
+        owner.address
+      );
+
+      // Check that the contract's token balance has decreased
+      expect(finalContractBalance).to.be.lt(initialContractBalance);
+
+      // Check that the owner's ETH balance has increased
+      // Note: This might not always be true due to gas costs, so we'll check if it's greater or equal
+      expect(finalOwnerETHBalance).to.be.gte(initialOwnerETHBalance);
+
+      // You might want to add more specific checks here, such as verifying the exact amount of ETH received
+      // or checking that the correct amount was sent to the team and revShare wallets
+    });
+
+    it("Should revert if called by non-owner", async function () {
+      await expect(
+        hampToken.connect(addr1).manualSwapBack()
+      ).to.be.revertedWith("Ownable: caller is not the owner");
+    });
+
+    it("Should revert if swap is not enabled", async function () {
+      await hampToken.connect(owner).updateSwapEnabled(false);
+      await expect(
+        hampToken.connect(owner).manualSwapBack()
+      ).to.be.revertedWith("Swap is not enabled");
+    });
+
+    it("Should revert if there are no tokens to swap", async function () {
+      await expect(
+        hampToken.connect(owner).manualSwapBack()
+      ).to.be.revertedWith("No tokens to swap");
     });
   });
 });

@@ -3,7 +3,8 @@
 # Variables
 NETWORK = buildbear
 # SCRIPT_PATH = scripts/deploy.ts
-DEPLOY_SCRIPT_PATH = deploy/deploy-hampter-auction.ts
+DEPLOY_SCRIPT_PATH = deploy/deploy-hamptoken.ts
+# DEPLOY_SCRIPT_PATH = deploy/deploy-hampter-auction.ts
 
 # Phony targets
 .PHONY: deploy clean help

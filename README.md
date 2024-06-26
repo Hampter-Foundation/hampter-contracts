@@ -14,6 +14,12 @@ Tests
 yarn test
 ```
 
+or if you don't have yarn installed
+
+```bash
+npx hardhat test
+```
+
 ## Makefile Commands
 
 Here's a concise README paragraph for the Makefile, focusing on the available commands:

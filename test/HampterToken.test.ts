@@ -1,6 +1,10 @@
 import { expect } from "chai";
 import { ethers, network } from "hardhat";
-import { time, loadFixture } from "@nomicfoundation/hardhat-network-helpers";
+import {
+  time,
+  loadFixture,
+  mine,
+} from "@nomicfoundation/hardhat-network-helpers";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 import {
   HampToken,
@@ -81,6 +85,12 @@ describe("HampToken", function () {
       teamWallet,
       revShareWallet,
     };
+  }
+
+  async function mineBlocks(numberOfBlocks: number) {
+    for (let i = 0; i < numberOfBlocks; i++) {
+      await network.provider.send("evm_mine");
+    }
   }
 
   async function deployNewToken(): Promise<HampToken> {
@@ -447,6 +457,10 @@ describe("HampToken", function () {
     }
 
     it("Should perform swap back when threshold is met", async function () {
+      // Set Team and RevShare wallets
+      await newToken.updateTeamWallet(teamWallet.address);
+      await newToken.updateRevShareWallet(revShareWallet.address);
+
       const swapThreshold = await newToken.swapTokensAtAmount();
       const initialTeamBalance = await ethers.provider.getBalance(
         teamWallet.address
@@ -511,7 +525,9 @@ describe("HampToken", function () {
       }
 
       // Wait for a few blocks to allow the swap to complete
-      await time.increase(60);
+      // Wait for a few blocks to allow the swap to complete
+      await mine(5); // Mine 5 blocks
+      await time.increase(60); // Increase time by 60 seconds
 
       const finalTeamBalance = await ethers.provider.getBalance(
         teamWallet.address
@@ -614,6 +630,10 @@ describe("HampToken", function () {
     });
 
     it("Should add liquidity during swap back", async function () {
+      // Set Team and RevShare wallets
+      await newToken.updateTeamWallet(teamWallet.address);
+      await newToken.updateRevShareWallet(revShareWallet.address);
+
       const swapThreshold = await newToken.swapTokensAtAmount();
       const pairAddress = await newToken.uniswapV2Pair();
 

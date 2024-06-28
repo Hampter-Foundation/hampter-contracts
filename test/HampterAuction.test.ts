@@ -15,9 +15,8 @@ describe("HampterAuction", function () {
   let multisig: Signer;
 
   beforeEach(async function () {
-    const HampterAuctionFactory = await ethers.getContractFactory(
-      "HampterAuction"
-    );
+    const HampterAuctionFactory =
+      await ethers.getContractFactory("HampterAuction");
     [owner, bidder1, bidder2, multisig] = await ethers.getSigners();
     auction = await HampterAuctionFactory.deploy();
   });
@@ -60,7 +59,7 @@ describe("HampterAuction", function () {
 
       await expect(
         auction.startAuction(startTime, endTime, minBid, minBidIncrement)
-      ).to.be.revertedWith("Auction has already started");
+      ).to.be.revertedWithCustomError(auction, "AuctionAlreadyStarted");
     });
   });
 
@@ -86,7 +85,7 @@ describe("HampterAuction", function () {
         .to.emit(auction, "BidPlaced")
         .withArgs(await bidder1.getAddress(), bidAmount);
 
-      const bidCount = await auction.bidCounts(await bidder1.getAddress());
+      const bidCount = await auction.getBidCount(await bidder1.getAddress());
       expect(bidCount).to.equal(1);
     });
 
@@ -98,7 +97,7 @@ describe("HampterAuction", function () {
 
       await expect(
         auction.connect(bidder1).placeBid({ value: bidAmount })
-      ).to.be.revertedWith("Auction has already ended");
+      ).to.be.revertedWithCustomError(auction, "AuctionAlreadyEnded");
     });
   });
 
@@ -129,19 +128,18 @@ describe("HampterAuction", function () {
     it("Should revert if the Auction has already ended", async function () {
       // end the auction once
       await auction.endAuction();
-      await expect(auction.endAuction()).to.be.revertedWith(
-        "Auction is not ongoing"
+      await expect(auction.endAuction()).to.be.revertedWithCustomError(
+        auction,
+        "AuctionNotOngoing"
       );
     });
 
     it("Should revert if a bid is placed after the auction has ended", async function () {
       const bidAmount = ethers.parseEther("0.2");
 
-      // No need to set the next block timestamp again, as it was already set in the beforeEach hook
-
       await expect(
         auction.connect(bidder1).placeBid({ value: bidAmount })
-      ).to.be.revertedWith("Auction has already ended");
+      ).to.be.revertedWithCustomError(auction, "AuctionAlreadyEnded");
     });
   });
 
@@ -199,9 +197,9 @@ describe("HampterAuction", function () {
       const winningBidIds = [BigInt(0), BigInt(1)];
       await auction.resetAuction();
 
-      await expect(auction.setWinners(winningBidIds)).to.be.revertedWith(
-        "Auction is not ended"
-      );
+      await expect(
+        auction.setWinners(winningBidIds)
+      ).to.be.revertedWithCustomError(auction, "AuctionNotEnded");
     });
   });
 
@@ -247,17 +245,15 @@ describe("HampterAuction", function () {
     it("Should allow a non-winning bidder to claim refund", async function () {
       const bidId = BigInt(0);
       const bidder1Address = await bidder1.getAddress();
-      const bidder1BalanceBefore = await ethers.provider.getBalance(
-        bidder1Address
-      );
+      const bidder1BalanceBefore =
+        await ethers.provider.getBalance(bidder1Address);
 
       await expect(auction.connect(bidder1).claimRefund(bidId))
         .to.emit(auction, "RefundClaimed")
         .withArgs(bidder1Address, ethers.parseEther("0.2"));
 
-      const bidder1BalanceAfter = await ethers.provider.getBalance(
-        bidder1Address
-      );
+      const bidder1BalanceAfter =
+        await ethers.provider.getBalance(bidder1Address);
       expect(bidder1BalanceAfter).to.be.gt(bidder1BalanceBefore);
 
       const bid = await auction.getBid(bidId);
@@ -269,7 +265,7 @@ describe("HampterAuction", function () {
 
       await expect(
         auction.connect(bidder2).claimRefund(bidId)
-      ).to.be.revertedWith("Winners cannot claim refund");
+      ).to.be.revertedWithCustomError(auction, "WinnerCannotClaimRefund");
     });
 
     it("Should revert if a bidder tries to claim refund twice", async function () {
@@ -279,7 +275,7 @@ describe("HampterAuction", function () {
 
       await expect(
         auction.connect(bidder1).claimRefund(bidId)
-      ).to.be.revertedWith("Refund has already been claimed");
+      ).to.be.revertedWithCustomError(auction, "RefundAlreadyClaimed");
     });
 
     it("Should revert if a non-bidder tries to claim refund", async function () {
@@ -287,7 +283,7 @@ describe("HampterAuction", function () {
 
       await expect(
         auction.connect(owner).claimRefund(bidId)
-      ).to.be.revertedWith("Only the bidder can claim the refund");
+      ).to.be.revertedWithCustomError(auction, "NotBidder");
     });
   });
   describe("withdrawWinningFunds", function () {
@@ -335,17 +331,15 @@ describe("HampterAuction", function () {
       await auction.setWinners(winningBidIds);
 
       const multisigAddress = await owner.getAddress();
-      const multisigBalanceBefore = await ethers.provider.getBalance(
-        multisigAddress
-      );
+      const multisigBalanceBefore =
+        await ethers.provider.getBalance(multisigAddress);
 
       await expect(auction.withdrawWinningFunds())
         .to.emit(auction, "FundsWithdrawn")
         .withArgs(multisigAddress, ethers.parseEther("0.5")); // 0.2 + 0.3 = 0.6
 
-      const multisigBalanceAfter = await ethers.provider.getBalance(
-        multisigAddress
-      );
+      const multisigBalanceAfter =
+        await ethers.provider.getBalance(multisigAddress);
 
       expect(multisigBalanceAfter - multisigBalanceBefore).to.be.closeTo(
         ethers.parseEther("0.5"),
@@ -459,9 +453,9 @@ describe("HampterAuction", function () {
       await auction.setWinners(winningBidIds);
       await auction.withdrawWinningFunds();
 
-      await expect(auction.withdrawRemainingFunds()).to.be.revertedWith(
-        "Remaining funds can only be withdrawn 1 month after the auction has ended"
-      );
+      await expect(
+        auction.withdrawRemainingFunds()
+      ).to.be.revertedWithCustomError(auction, "TooEarlyForRemainingFunds");
     });
   });
 });

@@ -80,6 +80,28 @@ contract HampterAuction is Ownable, ReentrancyGuard {
     uint32 public immutable maxBidPerAddress = 3; // Maximum that each address can bid - 3
     uint256 public nextBidId;
 
+    // Custom Errors
+        error AuctionAlreadyStarted();
+    error InvalidStartEndTime();
+    error EndTimeInPast();
+    error MinBidTooLow();
+    error AuctionNotOngoing();
+    error AuctionNotEnded();
+    error WinningBidsEmpty();
+    error InvalidBidId();
+    error AuctionNotStarted();
+    error AuctionAlreadyEnded();
+    error BidAmountTooLow();
+    error BidAmountNotMultiple();
+    error BidLimitReached();
+    error WinnersNotAnnounced();
+    error NotBidder();
+    error WinnerCannotClaimRefund();
+    error RefundAlreadyClaimed();
+    error NoWinningFunds();
+    error TooEarlyForRemainingFunds();
+    error NoRemainingFunds();
+
     constructor() Ownable(msg.sender) {
         auction = Auction(0, 0, 0, 0, AuctionState.NotStarted);
     }
@@ -96,13 +118,10 @@ contract HampterAuction is Ownable, ReentrancyGuard {
         uint256 _minBid,
         uint256 _minBidIncrement
     ) external onlyOwner {
-        require(
-            auction.auctionState == AuctionState.NotStarted,
-            "Auction has already started"
-        );
-        require(_startTime < _endTime, "Invalid start and end time");
-        require(_endTime > block.timestamp, "End time must be in the future");
-        require(_minBid > 0, "Minimum bid must be greater than 0");
+        if (auction.auctionState != AuctionState.NotStarted) revert AuctionAlreadyStarted();
+        if (_startTime >= _endTime) revert InvalidStartEndTime();
+        if (_endTime <= block.timestamp) revert EndTimeInPast();
+        if (_minBid == 0) revert MinBidTooLow();
         auction = Auction(
             _startTime,
             _endTime,
@@ -116,10 +135,8 @@ contract HampterAuction is Ownable, ReentrancyGuard {
      * @dev Ends the auction.
      */
     function endAuction() external onlyOwner {
-        require(
-            auction.auctionState == AuctionState.Ongoing,
-            "Auction is not ongoing"
-        );
+        if (auction.auctionState != AuctionState.Ongoing) revert AuctionNotOngoing();
+
         auction.auctionState = AuctionState.Ended;
         emit AuctionEnded();
     }
@@ -130,11 +147,8 @@ contract HampterAuction is Ownable, ReentrancyGuard {
 
     /// @dev Sets the winners of the auction
     function setWinners(uint256[] memory _winningBidIds) external onlyOwner {
-        require(
-            auction.auctionState == AuctionState.Ended,
-            "Auction is not ended"
-        );
-        require(_winningBidIds.length > 0, "Winning bids cannot be empty");
+        if (auction.auctionState != AuctionState.Ended) revert AuctionNotEnded();
+        if (_winningBidIds.length == 0) revert WinningBidsEmpty();
 
         for (uint256 i = 0; i < _winningBidIds.length; i++) {
             uint256 bidId = _winningBidIds[i];
@@ -155,28 +169,13 @@ contract HampterAuction is Ownable, ReentrancyGuard {
      */
     // Question: Should bid amount be an input as well?
     function placeBid() external payable nonReentrant{
-        require(
-            auction.auctionState == AuctionState.Ongoing,
-            "Auction is not ongoing"
-        );
-        require(
-            block.timestamp >= auction.startTime,
-            "Auction has not started yet"
-        );
-        require(
-            block.timestamp <= auction.endTime,
-            "Auction has already ended"
-        );
-        require(msg.value > 0, "Bid amount must be greater than 0");
-        require(
-            msg.value >= auction.minBid,
-            "Bid amount must be greater than or equal to the minimum bid amount"
-        );
-        require(
-            msg.value % auction.bidDenomination == 0,
-            "Bid amount must be a multiple of the bid denomination"
-        );
-         require(getBidCount(msg.sender) < maxBidPerAddress, "Bid limit reached");
+        if (auction.auctionState != AuctionState.Ongoing) revert AuctionNotOngoing();
+        if (block.timestamp < auction.startTime) revert AuctionNotStarted();
+        if (block.timestamp > auction.endTime) revert AuctionAlreadyEnded();
+        if (msg.value == 0) revert BidAmountTooLow();
+        if (msg.value < auction.minBid) revert BidAmountTooLow();
+        if (msg.value % auction.bidDenomination != 0) revert BidAmountNotMultiple();
+        if (getBidCount(msg.sender) >= maxBidPerAddress) revert BidLimitReached();
 
 
         uint256 currentBidId = nextBidId;
@@ -204,20 +203,14 @@ contract HampterAuction is Ownable, ReentrancyGuard {
 
     // NOTE: This is the most important function to secure
     function claimRefund(uint256 bidId) external nonReentrant {
-        require(
-            auction.auctionState == AuctionState.WinnersAnnounced,
-            "Winners have not been announced"
-        );
-        require(validBidIds[bidId], "Invalid bidId");
+        if (auction.auctionState != AuctionState.WinnersAnnounced) revert WinnersNotAnnounced();
+        if (!validBidIds[bidId]) revert InvalidBidId();
 
         uint256 bidIndex = bidIdToBidsIndex[bidId];
         Bid storage bid = bids[bidIndex]; // Use storage to get a reference to the actual storage
-        require(
-            bid.bidder == msg.sender,
-            "Only the bidder can claim the refund"
-        );
-        require(bid.isWinner == false, "Winners cannot claim refund");
-        require(bid.isClaimed == false, "Refund has already been claimed");
+        if (bid.bidder != msg.sender) revert NotBidder(); // Check if the caller is the bidder
+        if (bid.isWinner) revert WinnerCannotClaimRefund();
+        if (bid.isClaimed) revert RefundAlreadyClaimed();
 
         bid.isClaimed = true;
         payable(msg.sender).transfer(bid.amount); // TODO: Check if this is the right way to transfer funds
@@ -227,10 +220,7 @@ contract HampterAuction is Ownable, ReentrancyGuard {
 
     /// @dev Allows the owner to withdraw the winning funds after the auction has ended
     function withdrawWinningFunds() external onlyOwner {
-        require(
-            auction.auctionState == AuctionState.WinnersAnnounced,
-            "Winners have not been announced"
-        );
+        if (auction.auctionState != AuctionState.WinnersAnnounced) revert WinnersNotAnnounced();
 
         uint256 winningFunds = 0;
         for (uint256 i = 0; i < bids.length; i++) {
@@ -240,21 +230,15 @@ contract HampterAuction is Ownable, ReentrancyGuard {
             }
         }
 
-        require(winningFunds > 0, "No winning funds to withdraw");
+        if (winningFunds == 0) revert NoWinningFunds();
         payable(owner()).transfer(winningFunds);
         emit FundsWithdrawn(owner(), winningFunds);
     }
 
     /// @dev Allows the owner to withdraw remaining funds 1 month after the auction has ended
     function withdrawRemainingFunds() external onlyOwner {
-        require(
-            auction.auctionState == AuctionState.WinnersAnnounced,
-            "Winners have not been announced"
-        );
-        require(
-            block.timestamp >= auction.endTime + 30 days,
-            "Remaining funds can only be withdrawn 1 month after the auction has ended"
-        );
+        if (auction.auctionState != AuctionState.WinnersAnnounced) revert WinnersNotAnnounced();
+        if (block.timestamp < auction.endTime + 30 days) revert TooEarlyForRemainingFunds();
 
         uint256 remainingFunds = address(this).balance;
         require(remainingFunds > 0, "No remaining funds to withdraw");

@@ -74,7 +74,6 @@ contract HampterAuction is Ownable, ReentrancyGuard {
     // TODO: Perform gas optimization here
     Bid[] public bids;
     Auction public auction;
-    mapping(address => uint256) public bidCounts;
     mapping(address => uint256[]) public bidderToBidIds;
     mapping(uint256 => uint256) public bidIdToBidsIndex; // mapping of bidId to index in bids array
     mapping(uint256 => bool) public validBidIds; // mapping of bidId that are valid
@@ -155,7 +154,7 @@ contract HampterAuction is Ownable, ReentrancyGuard {
      * A bidder cannot update or cancel a bid once it is placed.
      */
     // Question: Should bid amount be an input as well?
-    function placeBid() external payable {
+    function placeBid() external payable nonReentrant{
         require(
             auction.auctionState == AuctionState.Ongoing,
             "Auction is not ongoing"
@@ -177,7 +176,8 @@ contract HampterAuction is Ownable, ReentrancyGuard {
             msg.value % auction.bidDenomination == 0,
             "Bid amount must be a multiple of the bid denomination"
         );
-        require(bidCounts[msg.sender] <= maxBidPerAddress, "Bid limit reached");
+         require(getBidCount(msg.sender) < maxBidPerAddress, "Bid limit reached");
+
 
         uint256 currentBidId = nextBidId;
         Bid memory newBid = Bid(
@@ -189,7 +189,6 @@ contract HampterAuction is Ownable, ReentrancyGuard {
         );
         bids.push(newBid);
         bidIdToBidsIndex[currentBidId] = bids.length - 1; // Map the bid ID to the index of the bid in the bids array
-        bidCounts[msg.sender]++;
         bidderToBidIds[msg.sender].push(currentBidId);
         nextBidId++;
         validBidIds[currentBidId] = true;
@@ -262,6 +261,11 @@ contract HampterAuction is Ownable, ReentrancyGuard {
 
         payable(owner()).transfer(remainingFunds);
         emit FundsWithdrawn(owner(), remainingFunds);
+    }
+        
+     /// @dev Returns the number of bids placed by a bidder.
+    function getBidCount(address bidder) public view returns (uint256) {
+        return bidderToBidIds[bidder].length;
     }
 }
 

@@ -14,8 +14,9 @@ sender: ["0x10000", "0x20000", "0x30000"]
 # Enable shrinking of failed test cases
 shrinkLimit: 5000
 
-# Specify any initialization functions to call after deployment
-initialize: []
+# Remove the initialize field if you don't need it
+# If you do need it, specify it as a string, for example:
+# initialize: "contractName.initializeFunction()"
 
 # Use fuzzing mode
 testMode: assertion
@@ -25,4 +26,3 @@ format: text
 
 # Specify any constants you want to use in your tests
 constants: []
-# Specify any additional configuration for your specific needs

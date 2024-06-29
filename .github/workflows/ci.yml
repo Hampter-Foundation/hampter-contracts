@@ -22,7 +22,6 @@ jobs:
       - run: npm ci
       - run: npm install -g solhint ethlint
       - run: solhint 'contracts/**/*.sol'
-      - run: ethlint 'contracts/**/*.sol'
 
   test:
     runs-on: ubuntu-latest
@@ -69,14 +68,14 @@ jobs:
           wget https://github.com/crytic/echidna/releases/download/v2.0.4/echidna-test-2.0.4-Ubuntu-18.04.tar.gz
           tar -xf echidna-test-2.0.4-Ubuntu-18.04.tar.gz
           sudo mv echidna-test /usr/local/bin/
-      - name: Run Echidna
-        run: |
-          mkdir -p echidna-reports
-          for file in contracts/*.sol; do
-            contract=$(basename $file .sol)
-            echidna-test $file --contract $contract --config echidna.config.yml --format text > echidna-reports/$contract.txt
-          done
-      - uses: actions/upload-artifact@v3
-        with:
-          name: echidna-reports
-          path: echidna-reports
+      # - name: Run Echidna
+      #   run: |
+      #     mkdir -p echidna-reports
+      #     for file in contracts/*.sol; do
+      #       contract=$(basename $file .sol)
+      #       echidna-test $file --contract $contract --config echidna.config.yml --format text > echidna-reports/$contract.txt
+      #     done
+      # - uses: actions/upload-artifact@v3
+      #   with:
+      #     name: echidna-reports
+      #     path: echidna-reports

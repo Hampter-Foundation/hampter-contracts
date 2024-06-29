@@ -13,7 +13,7 @@ jobs:
       - uses: actions/checkout@v3
       - uses: actions/setup-node@v3
         with:
-          node-version: '18.x'
+          node-version: "18.x"
       - name: Cache node modules
         uses: actions/cache@v3
         with:
@@ -30,7 +30,7 @@ jobs:
       - uses: actions/checkout@v3
       - uses: actions/setup-node@v3
         with:
-          node-version: '18.x'
+          node-version: "18.x"
       - name: Cache node modules
         uses: actions/cache@v3
         with:
@@ -55,7 +55,7 @@ jobs:
       - uses: actions/checkout@v3
       - uses: actions/setup-python@v4
         with:
-          python-version: '3.x'
+          python-version: "3.x"
       - name: Install Slither
         run: |
           pip3 install slither-analyzer
@@ -71,13 +71,12 @@ jobs:
           sudo mv echidna-test /usr/local/bin/
       - name: Run Echidna
         run: |
+          mkdir -p echidna-reports
           for file in contracts/*.sol; do
-            echidna-test $file --contract $(basename $file .sol) --config echidna.config.yml
+            contract=$(basename $file .sol)
+            echidna-test $file --contract $contract --config echidna.config.yml --format text > echidna-reports/$contract.txt
           done
       - uses: actions/upload-artifact@v3
         with:
-          name: security-reports
-          path: |
-            slither-report.txt
-            echidna-report.txt
-
+          name: echidna-reports
+          path: echidna-reports

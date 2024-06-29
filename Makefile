@@ -23,9 +23,12 @@ clean:
 	npx hardhat clean
 	rm -rf cache artifacts
 
-# Help command
-help:
-	@echo "Available commands:"
-	@echo "  make deploy    - Deploy the HampterAuction contract"
-	@echo "  make clean     - Clean build artifacts"
-	@echo "  make help      - Show this help message"
+# Run Echidna locally
+echidna:
+	@echo "Running Echidna on all contracts..."
+	mkdir -p echidna-reports
+	@for file in contracts/*.sol; do \
+		contract=$$(basename $$file .sol); \
+		echo "Testing $$contract..."; \
+		echidna-test $$file --contract $$contract --config $(ECHIDNA_CONFIG) > echidna-reports/$$contract.txt; \
+	done

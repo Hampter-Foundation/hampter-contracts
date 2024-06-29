@@ -1,0 +1,28 @@
+# Global settings
+testLimit: 50000
+seqLen: 100
+coverage: true
+corpusDir: echidna-corpus
+gasLimit: 8000000
+balanceAddr: 0xffffffff
+propMaxGas: 8000030
+testMaxGas: 8000030
+
+# Specify multiple sender addresses
+sender: ["0x10000", "0x20000", "0x30000"]
+
+# Enable shrinking of failed test cases
+shrinkLimit: 5000
+
+# Specify any initialization functions to call after deployment
+initialize: []
+
+# Use fuzzing mode
+testMode: assertion
+
+# Output format
+format: text
+
+# Specify any constants you want to use in your tests
+constants: []
+# Specify any additional configuration for your specific needs

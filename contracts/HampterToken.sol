@@ -183,7 +183,6 @@ contract HampToken is ERC20, Ownable, ERC20Burnable, ERC20Permit {
     function updateSwapTokensAtAmount(
         uint256 newAmount
     ) external onlyOwner returns (bool) {
-        // TODO: Revisit this logic
         require(
             newAmount >= (totalSupply() * 1) / 100000,
             "Swap amount cannot be lower than 0.001% total supply."

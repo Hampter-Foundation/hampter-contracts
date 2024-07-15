@@ -72,7 +72,6 @@ contract HampterAuction is Ownable, ReentrancyGuard {
         AirdropCompleted
     }
 
-    // TODO: Perform gas optimization here
     Bid[] public bids;
     Auction public auction;
     mapping(address => uint256[]) public bidderToBidIds;
@@ -214,7 +213,7 @@ contract HampterAuction is Ownable, ReentrancyGuard {
         if (bid.isClaimed) revert RefundAlreadyClaimed();
 
         bid.isClaimed = true;
-        payable(msg.sender).transfer(bid.amount); // TODO: Check if this is the right way to transfer funds
+        payable(msg.sender).transfer(bid.amount); 
 
         emit RefundClaimed(msg.sender, bid.amount);
     }

@@ -28,6 +28,9 @@ contract HampToken is ERC20, Ownable, ERC20Burnable, ERC20Permit {
     /// Acts as a mutex to ensure only one swap operation occurs at a time
     bool private isSwapInProgress;
 
+    // track the paused state
+    bool public paused;
+
     address public revShareWallet;
     address public teamWallet;
 
@@ -96,6 +99,19 @@ contract HampToken is ERC20, Ownable, ERC20Burnable, ERC20Permit {
 
     event SwapForETH(uint256 tokensSwapped);
 
+    event Paused(address account);
+    event Unpaused(address account);
+
+    modifier whenPaused() {
+        require(paused, "Contract is not paused");
+        _;
+    }
+
+    modifier whenNotPaused() {
+        require(!paused, "Contract is paused");
+        _;
+    }
+
     constructor(
         address _thrusterRouter
     ) ERC20("Hampter Token", "HAMP") Ownable() ERC20Permit("Hampter Token") {
@@ -150,7 +166,7 @@ contract HampToken is ERC20, Ownable, ERC20Burnable, ERC20Permit {
     }
 
     /// @dev Owner has to enable trading before the token can be traded
-    // once enabled, can never be turned off
+    // once enabled, can never be turned off unless contract is paused.
     function enableTrading() external onlyOwner {
         tradingActive = true;
         swapEnabled = true;
@@ -537,6 +553,22 @@ contract HampToken is ERC20, Ownable, ERC20Burnable, ERC20Permit {
         isSwapInProgress = true;
         _swapBack();
         isSwapInProgress = false;
+    }
+
+    /// @dev this function is for emergency use only
+    function pause() public onlyOwner whenNotPaused {
+        paused = true;
+        tradingActive = false;
+        swapEnabled = false;
+        emit Paused(msg.sender);
+    }
+
+    /// @dev this function can only be used when the contract is paused
+    function unpause() public onlyOwner whenPaused {
+        paused = false;
+        tradingActive = true;
+        swapEnabled = true; 
+        emit Unpaused(msg.sender);
     }
 
     receive() external payable {}

@@ -10,7 +10,6 @@ import {Ownable} from "./lib/openzeppelin-v4.90/contracts/access/Ownable.sol";
 import {SafeMath} from "./lib/openzeppelin-v4.90/contracts/utils/math/SafeMath.sol";
 import {SafeTransferLib} from "./lib/solmate/src/utils/SafeTransferLib.sol";
 
-// Interfaces
 import {IUniswapV2Router02} from "./interfaces/IUniswapV2Router02.sol";
 import {IUniswapV2Factory} from "./interfaces/IUniswapV2Factory.sol";
 
@@ -345,7 +344,7 @@ contract HampToken is ERC20, Ownable, ERC20Burnable, ERC20Permit {
         if (shouldApplyFees) {
             // on sell
             if (automatedMarketMakerPairs[to] && sellTotalFees > 0) {
-                fees = calculateFee(amount, sellTotalFees);
+                fees = _calculateFee(amount, sellTotalFees);
 
                 _accountForFees(
                     fees,
@@ -357,7 +356,7 @@ contract HampToken is ERC20, Ownable, ERC20Burnable, ERC20Permit {
             }
             // on buy
             else if (automatedMarketMakerPairs[from] && buyTotalFees > 0) {
-                fees = calculateFee(amount, buyTotalFees);
+                fees = _calculateFee(amount, buyTotalFees);
                 _accountForFees(
                     fees,
                     buyLiquidityFee,
@@ -533,7 +532,7 @@ contract HampToken is ERC20, Ownable, ERC20Burnable, ERC20Permit {
         excludeFromFees(_addr, isAuthorized);
     }
 
-    function calculateFee(
+    function _calculateFee(
         uint256 amount,
         uint256 feePercentage
     ) internal pure returns (uint256) {

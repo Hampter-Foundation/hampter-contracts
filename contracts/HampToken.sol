@@ -97,7 +97,7 @@ contract HampToken is ERC20, Ownable, ERC20Burnable, ERC20Permit {
     );
 
     event SwapForETH(uint256 tokensSwapped);
-
+    event TradingEnabled();
     event Paused(address account);
     event Unpaused(address account);
 
@@ -170,6 +170,7 @@ contract HampToken is ERC20, Ownable, ERC20Burnable, ERC20Permit {
         tradingActive = true;
         swapEnabled = true;
         preMigrationPhase = false;
+        emit TradingEnabled();
     }
 
     /// @dev Limits is for protection. remove limits once token is stable

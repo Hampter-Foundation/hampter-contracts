@@ -4,6 +4,7 @@ pragma solidity ^0.8.0;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/utils/math/Math.sol";
 
 contract HampterAuction is Ownable, ReentrancyGuard {
     /**
@@ -79,6 +80,7 @@ contract HampterAuction is Ownable, ReentrancyGuard {
     mapping(uint256 => bool) public validBidIds; // mapping of bidId that are valid
     uint32 public immutable maxBidPerAddress = 3; // Maximum that each address can bid - 3
     uint256 public nextBidId;
+    uint256 private lastProcessedIndex; // This is used to track the last processed index in the bids array for batched withdrawal
 
     // Custom Errors
         error AuctionAlreadyStarted();
@@ -219,16 +221,19 @@ contract HampterAuction is Ownable, ReentrancyGuard {
     }
 
     /// @dev Allows the owner to withdraw the winning funds after the auction has ended
-    function withdrawWinningFunds() external onlyOwner {
+    /// @param batchSize The number of bids to process in a single batch
+    function withdrawWinningFunds(uint256 batchSize) external onlyOwner {
         if (auction.auctionState != AuctionState.WinnersAnnounced) revert WinnersNotAnnounced();
+        uint256 endIndex = Math.min(lastProcessedIndex + batchSize, bids.length);
 
         uint256 winningFunds;
-        for (uint256 i = 0; i < bids.length; i++) {
+        for (uint256 i = lastProcessedIndex; i < endIndex; i++) {
             if (bids[i].isWinner && !bids[i].isClaimed) {
                 winningFunds += bids[i].amount;
                 bids[i].isClaimed = true;
             }
         }
+        lastProcessedIndex = endIndex;
 
         if (winningFunds == 0) revert NoWinningFunds();
         payable(owner()).transfer(winningFunds);

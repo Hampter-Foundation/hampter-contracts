@@ -132,10 +132,6 @@ contract HampterNFT is Ownable, ERC721A, ReentrancyGuard {
     // For marketing etc.
     function devMint(uint256 quantity) external onlyOwner {
         require(
-            totalSupply() + quantity <= amountForDevs,
-            "too many already minted before dev mint"
-        );
-        require(
             quantity % maxPerAddressDuringMint == 0,
             "can only mint a multiple of the maxBatchSize"
         );

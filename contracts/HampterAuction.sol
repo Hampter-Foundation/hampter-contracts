@@ -18,6 +18,7 @@ contract HampterAuction is Ownable, ReentrancyGuard {
         uint256 bidId;
         bool isWinner;
         bool isClaimed;
+        uint256 timestamp;
     }
 
     /**
@@ -184,7 +185,8 @@ contract HampterAuction is Ownable, ReentrancyGuard {
             msg.value,
             currentBidId,
             false,
-            false
+            false,
+            block.timestamp
         );
         bids.push(newBid);
         bidIdToBidsIndex[currentBidId] = bids.length - 1; // Map the bid ID to the index of the bid in the bids array
@@ -252,9 +254,3 @@ contract HampterAuction is Ownable, ReentrancyGuard {
         return bidderToBidIds[bidder].length;
     }
 }
-
-// TODO:
-// 1. Tests
-// 2. Test Deployment on testnet
-// 3. Fuzzing
-// 4. Static Analysis

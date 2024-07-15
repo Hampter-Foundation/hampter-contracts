@@ -39,7 +39,7 @@ contract HampToken is ERC20, Ownable, ERC20Burnable, ERC20Permit {
     bool public swapEnabled = false;
 
     // Anti-bot and anti-whale mappings and variables
-    mapping(address => bool) blacklisted;
+    mapping(address => bool) public blacklisted;
 
     uint256 private constant FEE_PERCENTAGE_SCALE = 10000; // 100.00%
     uint256 private constant MAX_SWAP_MULTIPLIER = 20; // Multiplier to cap the swap amonut of $HAMP in swapback

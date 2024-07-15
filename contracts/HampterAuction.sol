@@ -196,7 +196,7 @@ contract HampterAuction is Ownable, ReentrancyGuard {
     }
 
     /// @dev Returns the bid details for a given bidId
-    function getBid(uint256 bidId) public view returns (Bid memory) {
+    function getBid(uint256 bidId) external view returns (Bid memory) {
         uint256 bidIndex = bidIdToBidsIndex[bidId];
         return bids[bidIndex];
     }

@@ -232,7 +232,7 @@ contract HampToken is ERC20, Ownable, ERC20Burnable, ERC20Permit {
     function setAutomatedMarketMakerPair(
         address pair,
         bool value
-    ) public onlyOwner {
+    ) external onlyOwner {
         require(
             pair != uniswapV2Pair,
             "The pair cannot be removed from automatedMarketMakerPairs"
@@ -259,11 +259,11 @@ contract HampToken is ERC20, Ownable, ERC20Burnable, ERC20Permit {
         teamWallet = newWallet;
     }
 
-    function isExcludedFromFees(address account) public view returns (bool) {
+    function isExcludedFromFees(address account) external view returns (bool) {
         return _isExcludedFromFees[account];
     }
 
-    function isBlacklisted(address account) public view returns (bool) {
+    function isBlacklisted(address account) external view returns (bool) {
         return blacklisted[account];
     }
 
@@ -510,7 +510,7 @@ contract HampToken is ERC20, Ownable, ERC20Burnable, ERC20Permit {
         payable(toAddr).safeTransferETH(address(this).balance);
     }
 
-    function blacklist(address _addr) public onlyOwner {
+    function blacklist(address _addr) external onlyOwner {
         require(
             _addr != address(uniswapV2Pair) &&
                 _addr != address(uniswapV2Router),
@@ -520,7 +520,7 @@ contract HampToken is ERC20, Ownable, ERC20Burnable, ERC20Permit {
     }
 
     /// @dev unblacklist address; not affected by blacklistRenounced incase team wants to unblacklist v3 pools down the road
-    function unblacklist(address _addr) public onlyOwner {
+    function unblacklist(address _addr) external onlyOwner {
         blacklisted[_addr] = false;
     }
 
@@ -528,7 +528,7 @@ contract HampToken is ERC20, Ownable, ERC20Burnable, ERC20Permit {
     function setPreMigrationTransferable(
         address _addr,
         bool isAuthorized
-    ) public onlyOwner {
+    ) external onlyOwner {
         preMigrationTransferrable[_addr] = isAuthorized;
         excludeFromFees(_addr, isAuthorized);
     }

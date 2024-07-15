@@ -173,10 +173,9 @@ contract HampterAuction is Ownable, ReentrancyGuard {
         if (auction.auctionState != AuctionState.Ongoing) revert AuctionNotOngoing();
         if (block.timestamp < auction.startTime) revert AuctionNotStarted();
         if (block.timestamp > auction.endTime) revert AuctionAlreadyEnded();
-        if (msg.value == 0) revert BidAmountTooLow();
         if (msg.value < auction.minBid) revert BidAmountTooLow();
         if (msg.value % auction.bidDenomination != 0) revert BidAmountNotMultiple();
-        if (getBidCount(msg.sender) >= maxBidPerAddress) revert BidLimitReached();
+        if (getBidCount(msg.sender) == maxBidPerAddress) revert BidLimitReached();
 
 
         uint256 currentBidId = nextBidId;
@@ -224,7 +223,7 @@ contract HampterAuction is Ownable, ReentrancyGuard {
     function withdrawWinningFunds() external onlyOwner {
         if (auction.auctionState != AuctionState.WinnersAnnounced) revert WinnersNotAnnounced();
 
-        uint256 winningFunds = 0;
+        uint256 winningFunds;
         for (uint256 i = 0; i < bids.length; i++) {
             if (bids[i].isWinner && !bids[i].isClaimed) {
                 winningFunds += bids[i].amount;

@@ -276,8 +276,6 @@ contract HampToken is ERC20, Ownable, ERC20Burnable, ERC20Permit {
         address to,
         uint256 amount
     ) internal override {
-        require(from != address(0), "ERC20: transfer from the zero address");
-        require(to != address(0), "ERC20: transfer to the zero address");
         require(!blacklisted[from], "Sender blacklisted");
         require(!blacklisted[to], "Receiver blacklisted");
 

@@ -60,6 +60,7 @@ import "@openzeppelin/contracts/token/ERC721/utils/ERC721Holder.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
+/// @dev NFTStaking contract allows users to stake NFTs from approved collections for PlayHampter
 contract NFTStaking is ERC721Holder, Ownable, ReentrancyGuard {
     struct StakedNFT {
         address collection;
@@ -144,7 +145,6 @@ contract NFTStaking is ERC721Holder, Ownable, ReentrancyGuard {
             _tokenId
         );
 
-        // Remove the token from userStakedTokens
         StakedNFT[] storage userNFTs = userStakedTokens[msg.sender];
         for (uint256 i = 0; i < userNFTs.length; i++) {
             if (

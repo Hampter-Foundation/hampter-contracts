@@ -31,7 +31,7 @@
 //         @*                                                                        @
 //        :@                                                                         -@
 //        @+                                                                          @#
-//       -@                                                                            @-        
+//       -@                                                                            @-
 //       @                                                                              @
 //      @:                                                                              :@
 //      @                                                                                @*
@@ -51,7 +51,7 @@
 // ██╔═══╝ ██║     ██╔══██║  ╚██╔╝  ██╔══██║██╔══██║██║╚██╔╝██║██╔═══╝    ██║   ██╔══╝  ██╔══██╗
 // ██║     ███████╗██║  ██║   ██║   ██║  ██║██║  ██║██║ ╚═╝ ██║██║        ██║   ███████╗██║  ██║
 // ╚═╝     ╚══════╝╚═╝  ╚═╝   ╚═╝   ╚═╝  ╚═╝╚═╝  ╚═╝╚═╝     ╚═╝╚═╝        ╚═╝   ╚══════╝╚═╝  ╚═╝
-// https://playhampter.com/ 
+// https://playhampter.com/
 
 pragma solidity ^0.8.0;
 
@@ -69,11 +69,19 @@ contract NFTStaking is ERC721Holder, Ownable, ReentrancyGuard {
     }
 
     mapping(address => mapping(uint256 => StakedNFT)) public stakedNFTs;
-    mapping(address => uint256[]) public userStakedTokens;
+    mapping(address => StakedNFT[]) public userStakedTokens;
     mapping(address => bool) public allowedCollections;
 
-    event NFTStaked(address indexed collection, uint256 indexed tokenId, address indexed owner);
-    event NFTUnstaked(address indexed collection, uint256 indexed tokenId, address indexed owner);
+    event NFTStaked(
+        address indexed collection,
+        uint256 indexed tokenId,
+        address indexed owner
+    );
+    event NFTUnstaked(
+        address indexed collection,
+        uint256 indexed tokenId,
+        address indexed owner
+    );
     event CollectionAdded(address indexed collection);
     event CollectionRemoved(address indexed collection);
 
@@ -91,35 +99,60 @@ contract NFTStaking is ERC721Holder, Ownable, ReentrancyGuard {
         emit CollectionRemoved(_collection);
     }
 
-    function stakeNFT(address _collection, uint256 _tokenId) external nonReentrant {
+    function stakeNFT(
+        address _collection,
+        uint256 _tokenId
+    ) external nonReentrant {
         require(allowedCollections[_collection], "Collection not allowed");
-        require(stakedNFTs[_collection][_tokenId].owner == address(0), "NFT already staked");
+        require(
+            stakedNFTs[_collection][_tokenId].owner == address(0),
+            "NFT already staked"
+        );
 
-        IERC721(_collection).safeTransferFrom(msg.sender, address(this), _tokenId);
+        IERC721(_collection).safeTransferFrom(
+            msg.sender,
+            address(this),
+            _tokenId
+        );
 
-        stakedNFTs[_collection][_tokenId] = StakedNFT({
+        StakedNFT memory newStakedNFT = StakedNFT({
             collection: _collection,
             tokenId: _tokenId,
             owner: msg.sender,
             timestamp: block.timestamp
         });
 
-        userStakedTokens[msg.sender].push(_tokenId);
+        stakedNFTs[_collection][_tokenId] = newStakedNFT;
+        userStakedTokens[msg.sender].push(newStakedNFT);
 
         emit NFTStaked(_collection, _tokenId, msg.sender);
     }
 
-    function unstakeNFT(address _collection, uint256 _tokenId) external nonReentrant {
+    function unstakeNFT(
+        address _collection,
+        uint256 _tokenId
+    ) external nonReentrant {
         StakedNFT storage stakedNFT = stakedNFTs[_collection][_tokenId];
-        require(stakedNFT.owner == msg.sender, "Not the owner of this staked NFT");
+        require(
+            stakedNFT.owner == msg.sender,
+            "Not the owner of this staked NFT"
+        );
 
-        IERC721(_collection).safeTransferFrom(address(this), msg.sender, _tokenId);
+        IERC721(_collection).safeTransferFrom(
+            address(this),
+            msg.sender,
+            _tokenId
+        );
 
         // Remove the token from userStakedTokens
-        for (uint256 i = 0; i < userStakedTokens[msg.sender].length; i++) {
-            if (userStakedTokens[msg.sender][i] == _tokenId) {
-                userStakedTokens[msg.sender][i] = userStakedTokens[msg.sender][userStakedTokens[msg.sender].length - 1];
-                userStakedTokens[msg.sender].pop();
+        StakedNFT[] storage userNFTs = userStakedTokens[msg.sender];
+        for (uint256 i = 0; i < userNFTs.length; i++) {
+            if (
+                userNFTs[i].collection == _collection &&
+                userNFTs[i].tokenId == _tokenId
+            ) {
+                userNFTs[i] = userNFTs[userNFTs.length - 1];
+                userNFTs.pop();
                 break;
             }
         }
@@ -129,29 +162,45 @@ contract NFTStaking is ERC721Holder, Ownable, ReentrancyGuard {
         emit NFTUnstaked(_collection, _tokenId, msg.sender);
     }
 
-    function getStakedNFTOwner(address _collection, uint256 _tokenId) external view returns (address) {
+    function getStakedNFTOwner(
+        address _collection,
+        uint256 _tokenId
+    ) external view returns (address) {
         return stakedNFTs[_collection][_tokenId].owner;
     }
 
-    function getUserStakedNFTs(address _user) external view returns (StakedNFT[] memory) {
-        uint256[] memory tokenIds = userStakedTokens[_user];
-        StakedNFT[] memory userNFTs = new StakedNFT[](tokenIds.length);
+    function getUserStakedNFTs(
+        address _user
+    ) external view returns (StakedNFT[] memory) {
+        return userStakedTokens[_user];
+    }
 
-        for (uint256 i = 0; i < tokenIds.length; i++) {
-            uint256 tokenId = tokenIds[i];
-            address collection = stakedNFTs[stakedNFTs[address(0)][tokenId].collection][tokenId].collection;
-            userNFTs[i] = stakedNFTs[collection][tokenId];
+    function getUserStakedNFTsForCollection(
+        address _user,
+        address _collection
+    ) external view returns (StakedNFT[] memory) {
+        StakedNFT[] memory allUserNFTs = userStakedTokens[_user];
+        uint256 count = 0;
+
+        // First, count how many NFTs the user has staked from this collection
+        for (uint256 i = 0; i < allUserNFTs.length; i++) {
+            if (allUserNFTs[i].collection == _collection) {
+                count++;
+            }
+        }
+
+        // Create an array of the correct size
+        StakedNFT[] memory userNFTs = new StakedNFT[](count);
+
+        // Fill the array with the user's staked NFTs from this collection
+        uint256 index = 0;
+        for (uint256 i = 0; i < allUserNFTs.length; i++) {
+            if (allUserNFTs[i].collection == _collection) {
+                userNFTs[index] = allUserNFTs[i];
+                index++;
+            }
         }
 
         return userNFTs;
-    }
-
-    function onERC721Received(
-        address,
-        address,
-        uint256,
-        bytes memory
-    ) public virtual override returns (bytes4) {
-        return this.onERC721Received.selector;
     }
 }

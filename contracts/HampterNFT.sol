@@ -31,7 +31,7 @@
 //         @*                                                                        @
 //        :@                                                                         -@
 //        @+                                                                          @#
-//       -@                                                                            @-        
+//       -@                                                                            @-
 //       @                                                                              @
 //      @:                                                                              :@
 //      @                                                                                @*
@@ -65,6 +65,7 @@ contract HampterNFT is Ownable, ERC721A, ReentrancyGuard {
     uint256 public immutable maxPerAddressDuringMint;
     uint256 public immutable amountForDevs;
     uint256 public immutable collectionSize;
+    string private _baseTokenURI;
 
     struct SaleConfig {
         uint32 publicSaleStartTime;
@@ -187,8 +188,15 @@ contract HampterNFT is Ownable, ERC721A, ReentrancyGuard {
         }
     }
 
-    // // metadata URI
-    string private _baseTokenURI;
+    /// @dev For marketing et
+    function mint(address recipient, uint256 quantity) external onlyOwner {
+        require(
+            totalSupply() + quantity <= collectionSize,
+            "Would exceed max supply"
+        );
+
+        _mint(recipient, quantity);
+    }
 
     function _baseURI() internal view virtual override returns (string memory) {
         return _baseTokenURI;

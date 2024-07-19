@@ -1,5 +1,9 @@
 import { HardhatUserConfig } from "hardhat/config";
 import "@nomicfoundation/hardhat-toolbox";
+import * as dotenv from "dotenv";
+
+// Load environment variables from .env file
+dotenv.config({ path: __dirname + "/.env" });
 
 const config: HardhatUserConfig = {
   solidity: {
@@ -31,11 +35,18 @@ const config: HardhatUserConfig = {
         "0xc654e3e469cd86131473b30d0bf9087ab5f5d3b73e750fc1f1cb9db71b13581e",
       ],
     },
+    arbitrumSepolia: {
+      url: "https://sepolia-rollup.arbitrum.io/rpc",
+      chainId: 421614,
+      accounts:
+        process.env.PRIVATE_KEY !== undefined ? [process.env.PRIVATE_KEY] : [],
+    },
   },
   etherscan: {
     enabled: true,
     apiKey: {
       buildbear: "verifyContract",
+      arbitrumSepolia: process.env.ARBISCAN_API_KEY || "",
     },
     customChains: [
       {

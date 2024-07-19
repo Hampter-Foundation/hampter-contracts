@@ -12,7 +12,9 @@
   "devDependencies": {
     "@nomicfoundation/hardhat-ignition": "^0.15.5",
     "@nomicfoundation/hardhat-toolbox": "^5.0.0",
+    "@nomiclabs/hardhat-etherscan": "^3.1.8",
     "@types/node": "^20.12.12",
+    "dotenv": "^16.4.5",
     "erc721a": "^4.3.0",
     "hardhat": "^2.22.4",
     "prettier": "^3.3.2",

@@ -10,7 +10,7 @@ async function main() {
   const NFT_CONTRACT_ADDRESS = "0xEb123fF7B08BB91983A78eAC350af0F244569c8a";
 
   // The new base URI you want to set
-  const NEW_BASE_URI = "ipfs://QmaEvCw4x89kLWktEGshtpnZbjux6bgYBpd6Tse22BtB6g";
+  const NEW_BASE_URI = "ipfs://QmPaTdqXizZ8WeNKb64dENpndSLfY7QpuWLqE9ZJAyWctU";
 
   // Get the NFT contract
   const NFTContract = await ethers.getContractFactory("NFTStaking");

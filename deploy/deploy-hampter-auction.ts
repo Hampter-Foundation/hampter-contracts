@@ -11,7 +11,7 @@ async function main() {
   // Start the auction
   const startTime = Math.floor(Date.now() / 1000); // Current time in seconds
   const endTime = startTime + 100 * 24 * 60 * 60; // 100 days from now
-  const minBid = ethers.parseEther("0.1"); // 0.1 ETH as minimum bid
+  const minBid = ethers.parseEther("0.069"); // 0.069 ETH as minimum bid
   const bidDenomination = ethers.parseEther("0.1"); // 0.1 ETH as bid denomination
 
   console.log("Starting auction...");

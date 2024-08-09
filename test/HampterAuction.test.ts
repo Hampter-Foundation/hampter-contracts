@@ -246,7 +246,7 @@ describe("HampterAuction", function () {
       const bidder1BalanceBefore =
         await ethers.provider.getBalance(bidder1Address);
 
-      await expect(auction.connect(bidder1).claimRefund(bidId))
+      await expect(auction.connect(bidder1).claimRefund(bidId, bidder1Address))
         .to.emit(auction, "RefundClaimed")
         .withArgs(bidder1Address, ethers.parseEther("0.2"));
 
@@ -260,27 +260,30 @@ describe("HampterAuction", function () {
 
     it("Should revert if a winning bidder tries to claim refund", async function () {
       const bidId = BigInt(1);
+      const bidder2Address = await bidder2.getAddress();
 
       await expect(
-        auction.connect(bidder2).claimRefund(bidId)
+        auction.connect(bidder2).claimRefund(bidId, bidder2Address)
       ).to.be.revertedWithCustomError(auction, "WinnerCannotClaimRefund");
     });
 
     it("Should revert if a bidder tries to claim refund twice", async function () {
       const bidId = BigInt(0);
+      const bidder1Address = await bidder1.getAddress();
 
-      await auction.connect(bidder1).claimRefund(bidId);
+      await auction.connect(bidder1).claimRefund(bidId, bidder1Address);
 
       await expect(
-        auction.connect(bidder1).claimRefund(bidId)
+        auction.connect(bidder1).claimRefund(bidId, bidder1Address)
       ).to.be.revertedWithCustomError(auction, "RefundAlreadyClaimed");
     });
 
     it("Should revert if a non-bidder tries to claim refund", async function () {
       const bidId = BigInt(0);
+      const ownerAddress = await owner.getAddress();
 
       await expect(
-        auction.connect(owner).claimRefund(bidId)
+        auction.connect(owner).claimRefund(bidId, ownerAddress)
       ).to.be.revertedWithCustomError(auction, "NotBidder");
     });
   });
@@ -331,7 +334,9 @@ describe("HampterAuction", function () {
       const bidder1BalanceBefore =
         await ethers.provider.getBalance(bidder1Address);
 
-      await expect(auction.connect(bidder1).claimRefunds(bidIds))
+      await expect(
+        auction.connect(bidder1).claimRefunds(bidIds, bidder1Address)
+      )
         .to.emit(auction, "RefundClaimed")
         .withArgs(bidder1Address, ethers.parseEther("0.2"));
 
@@ -347,37 +352,41 @@ describe("HampterAuction", function () {
 
     it("Should revert if a winning bidder tries to claim refund", async function () {
       const bidId = BigInt(2);
+      const bidder2Address = await bidder2.getAddress();
 
       await expect(
-        auction.connect(bidder2).claimRefund(bidId)
+        auction.connect(bidder2).claimRefund(bidId, bidder2Address)
       ).to.be.revertedWithCustomError(auction, "WinnerCannotClaimRefund");
     });
 
     it("Should revert if a bidder tries to claim refund twice", async function () {
       const bidIds = [BigInt(0), BigInt(1)];
+      const bidder1Address = await bidder1.getAddress();
 
-      await auction.connect(bidder1).claimRefunds(bidIds);
+      await auction.connect(bidder1).claimRefunds(bidIds, bidder1Address);
 
       await expect(
-        auction.connect(bidder1).claimRefunds(bidIds)
+        auction.connect(bidder1).claimRefunds(bidIds, bidder1Address)
       ).to.be.revertedWithCustomError(auction, "RefundAlreadyClaimed");
     });
 
     it("Should revert if a bidder tries to claim refund individually then all at once", async function () {
       const bidIds = [BigInt(0), BigInt(1)];
+      const bidder1Address = await bidder1.getAddress();
 
-      await auction.connect(bidder1).claimRefund(bidIds[0]);
+      await auction.connect(bidder1).claimRefund(bidIds[0], bidder1Address);
 
       await expect(
-        auction.connect(bidder1).claimRefunds(bidIds)
+        auction.connect(bidder1).claimRefunds(bidIds, bidder1Address)
       ).to.be.revertedWithCustomError(auction, "RefundAlreadyClaimed");
     });
 
-    it("Should revert if a non-bidder tries to claim refund", async function () {
-      const bidId = BigInt(0);
+    it("Should revert if a non-bidder tries to claim refunds", async function () {
+      const bidIds = [BigInt(0), BigInt(1)];
+      const ownerAddress = await owner.getAddress();
 
       await expect(
-        auction.connect(owner).claimRefund(bidId)
+        auction.connect(owner).claimRefunds(bidIds, ownerAddress)
       ).to.be.revertedWithCustomError(auction, "NotBidder");
     });
   });

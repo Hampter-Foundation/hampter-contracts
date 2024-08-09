@@ -240,41 +240,30 @@ contract HampterAuction is Ownable, ReentrancyGuard {
         return bids[bidIndex];
     }
 
+    function claimRefund(uint256 bidId, address refunder) external nonReentrant {
+        _claimRefund(bidId, refunder);
+    }
+
     // NOTE: This is the most important function to secure
-    function claimRefund(uint256 bidId) external nonReentrant {
+    function _claimRefund(uint256 bidId, address refunder) private {
         if (auction.auctionState != AuctionState.WinnersAnnounced) revert WinnersNotAnnounced();
         if (!validBidIds[bidId]) revert InvalidBidId();
 
         uint256 bidIndex = bidIdToBidsIndex[bidId];
         Bid storage bid = bids[bidIndex]; // Use storage to get a reference to the actual storage
-        if (bid.bidder != msg.sender) revert NotBidder(); // Check if the caller is the bidder
+        if (bid.bidder != refunder) revert NotBidder(); // Check if the caller is the bidder
         if (bid.isWinner) revert WinnerCannotClaimRefund();
         if (bid.isClaimed) revert RefundAlreadyClaimed();
 
         bid.isClaimed = true;
-        payable(msg.sender).transfer(bid.amount);
+        payable(refunder).transfer(bid.amount);
 
-        emit RefundClaimed(msg.sender, bid.amount);
+        emit RefundClaimed(refunder, bid.amount);
     }
 
-    function claimRefunds(uint256[] calldata bidIds) external nonReentrant {
-        if (auction.auctionState != AuctionState.WinnersAnnounced) revert WinnersNotAnnounced();
-
+    function claimRefunds(uint256[] calldata bidIds, address refunder) external nonReentrant {
         for (uint256 i = 0; i < bidIds.length; i++) {
-            uint256 bidId = bidIds[i];
-            if (!validBidIds[bidId]) revert InvalidBidId();
-
-            uint256 bidIndex = bidIdToBidsIndex[bidId];
-            Bid storage bid = bids[bidIndex]; // Use storage to get a reference to the actual storage
-
-            if (bid.bidder != msg.sender) revert NotBidder(); // Check if the caller is the bidder
-            if (bid.isWinner) revert WinnerCannotClaimRefund();
-            if (bid.isClaimed) revert RefundAlreadyClaimed();
-
-            bid.isClaimed = true;
-            payable(msg.sender).transfer(bid.amount);
-
-            emit RefundClaimed(msg.sender, bid.amount);
+            _claimRefund(bidIds[i], refunder);
         }
     }
 

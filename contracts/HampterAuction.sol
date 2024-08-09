@@ -31,7 +31,7 @@
 //         @*                                                                        @
 //        :@                                                                         -@
 //        @+                                                                          @#
-//       -@                                                                            @-        
+//       -@                                                                            @-
 //       @                                                                              @
 //      @:                                                                              :@
 //      @                                                                                @*
@@ -136,7 +136,7 @@ contract HampterAuction is Ownable, ReentrancyGuard {
     uint256 private lastProcessedIndex; // This is used to track the last processed index in the bids array for batched withdrawal
 
     // Custom Errors
-        error AuctionAlreadyStarted();
+    error AuctionAlreadyStarted();
     error InvalidStartEndTime();
     error EndTimeInPast();
     error MinBidTooLow();
@@ -167,23 +167,15 @@ contract HampterAuction is Ownable, ReentrancyGuard {
      * @param _endTime The end timestamp of the auction.
      * @param _minBid The minimum bid amount.
      */
-    function startAuction(
-        uint256 _startTime,
-        uint256 _endTime,
-        uint256 _minBid,
-        uint256 _minBidIncrement
-    ) external onlyOwner {
+    function startAuction(uint256 _startTime, uint256 _endTime, uint256 _minBid, uint256 _minBidIncrement)
+        external
+        onlyOwner
+    {
         if (auction.auctionState != AuctionState.NotStarted) revert AuctionAlreadyStarted();
         if (_startTime >= _endTime) revert InvalidStartEndTime();
         if (_endTime <= block.timestamp) revert EndTimeInPast();
         if (_minBid == 0) revert MinBidTooLow();
-        auction = Auction(
-            _startTime,
-            _endTime,
-            _minBid,
-            _minBidIncrement,
-            AuctionState.Ongoing
-        );
+        auction = Auction(_startTime, _endTime, _minBid, _minBidIncrement, AuctionState.Ongoing);
     }
 
     /**
@@ -223,7 +215,7 @@ contract HampterAuction is Ownable, ReentrancyGuard {
      * A bidder cannot update or cancel a bid once it is placed.
      */
     // Question: Should bid amount be an input as well?
-    function placeBid() external payable nonReentrant{
+    function placeBid() external payable nonReentrant {
         if (auction.auctionState != AuctionState.Ongoing) revert AuctionNotOngoing();
         if (block.timestamp < auction.startTime) revert AuctionNotStarted();
         if (block.timestamp > auction.endTime) revert AuctionAlreadyEnded();
@@ -231,16 +223,8 @@ contract HampterAuction is Ownable, ReentrancyGuard {
         if (msg.value % auction.bidDenomination != 0) revert BidAmountNotMultiple();
         if (getBidCount(msg.sender) == maxBidPerAddress) revert BidLimitReached();
 
-
         uint256 currentBidId = nextBidId;
-        Bid memory newBid = Bid(
-            msg.sender,
-            msg.value,
-            currentBidId,
-            false,
-            false,
-            block.timestamp
-        );
+        Bid memory newBid = Bid(msg.sender, msg.value, currentBidId, false, false, block.timestamp);
         bids.push(newBid);
         bidIdToBidsIndex[currentBidId] = bids.length - 1; // Map the bid ID to the index of the bid in the bids array
         bidderToBidIds[msg.sender].push(currentBidId);
@@ -256,21 +240,31 @@ contract HampterAuction is Ownable, ReentrancyGuard {
         return bids[bidIndex];
     }
 
+    function claimRefund(uint256 bidId, address refunder) external nonReentrant {
+        _claimRefund(bidId, refunder);
+    }
+
     // NOTE: This is the most important function to secure
-    function claimRefund(uint256 bidId) external nonReentrant {
+    function _claimRefund(uint256 bidId, address refunder) private {
         if (auction.auctionState != AuctionState.WinnersAnnounced) revert WinnersNotAnnounced();
         if (!validBidIds[bidId]) revert InvalidBidId();
 
         uint256 bidIndex = bidIdToBidsIndex[bidId];
         Bid storage bid = bids[bidIndex]; // Use storage to get a reference to the actual storage
-        if (bid.bidder != msg.sender) revert NotBidder(); // Check if the caller is the bidder
+        if (bid.bidder != refunder) revert NotBidder(); // Check if the caller is the bidder
         if (bid.isWinner) revert WinnerCannotClaimRefund();
         if (bid.isClaimed) revert RefundAlreadyClaimed();
 
         bid.isClaimed = true;
-        payable(msg.sender).transfer(bid.amount); 
+        payable(refunder).transfer(bid.amount);
 
-        emit RefundClaimed(msg.sender, bid.amount);
+        emit RefundClaimed(refunder, bid.amount);
+    }
+
+    function claimRefunds(uint256[] calldata bidIds, address refunder) external nonReentrant {
+        for (uint256 i = 0; i < bidIds.length; i++) {
+            _claimRefund(bidIds[i], refunder);
+        }
     }
 
     /// @dev Allows the owner to withdraw the winning funds after the auction has ended
@@ -304,8 +298,8 @@ contract HampterAuction is Ownable, ReentrancyGuard {
         payable(owner()).transfer(remainingFunds);
         emit FundsWithdrawn(owner(), remainingFunds);
     }
-        
-     /// @dev Returns the number of bids placed by a bidder.
+
+    /// @dev Returns the number of bids placed by a bidder.
     function getBidCount(address bidder) public view returns (uint256) {
         return bidderToBidIds[bidder].length;
     }

@@ -1,8 +1,6 @@
 import { expect } from "chai";
+import { Signer } from "ethers";
 import { ethers } from "hardhat";
-import { HampterNFT } from "../typechain-types/HampterAuction";
-import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
-import { Contract, Signer } from "ethers";
 import { HampterAuction } from "../typechain-types";
 
 // TODO: Try to break the code
@@ -104,7 +102,7 @@ describe("HampterAuction", function () {
   describe("endAuction", function () {
     beforeEach(async function () {
       const currentBlock = await ethers.provider.getBlock("latest");
-      const currentTime = currentBlock?.timestamp;
+      const currentTime = currentBlock?.timestamp ?? 0;
       const startTime = currentTime + 60; // Start auction after 1 minute
       const endTime = startTime + 3600; // End auction 1 hour after it starts
 
@@ -149,7 +147,7 @@ describe("HampterAuction", function () {
 
     beforeEach(async function () {
       const currentBlock = await ethers.provider.getBlock("latest");
-      const currentTime = currentBlock?.timestamp;
+      const currentTime = currentBlock?.timestamp ?? 0;
 
       startTime = currentTime + 60; // Start auction after 1 minute
       endTime = startTime + 3600; // End auction 1 hour after it starts
@@ -208,7 +206,7 @@ describe("HampterAuction", function () {
     let endTime: number;
     beforeEach(async function () {
       const currentBlock = await ethers.provider.getBlock("latest");
-      const currentTime = currentBlock?.timestamp;
+      const currentTime = currentBlock?.timestamp ?? 0;
 
       startTime = currentTime + 60; // Start auction after 1 minute
       endTime = startTime + 3600; // End auction 1 hour after it starts
@@ -248,7 +246,7 @@ describe("HampterAuction", function () {
       const bidder1BalanceBefore =
         await ethers.provider.getBalance(bidder1Address);
 
-      await expect(auction.connect(bidder1).claimRefund(bidId))
+      await expect(auction.connect(bidder1).claimRefund(bidId, bidder1Address))
         .to.emit(auction, "RefundClaimed")
         .withArgs(bidder1Address, ethers.parseEther("0.2"));
 
@@ -262,37 +260,144 @@ describe("HampterAuction", function () {
 
     it("Should revert if a winning bidder tries to claim refund", async function () {
       const bidId = BigInt(1);
+      const bidder2Address = await bidder2.getAddress();
 
       await expect(
-        auction.connect(bidder2).claimRefund(bidId)
+        auction.connect(bidder2).claimRefund(bidId, bidder2Address)
       ).to.be.revertedWithCustomError(auction, "WinnerCannotClaimRefund");
     });
 
     it("Should revert if a bidder tries to claim refund twice", async function () {
       const bidId = BigInt(0);
+      const bidder1Address = await bidder1.getAddress();
 
-      await auction.connect(bidder1).claimRefund(bidId);
+      await auction.connect(bidder1).claimRefund(bidId, bidder1Address);
 
       await expect(
-        auction.connect(bidder1).claimRefund(bidId)
+        auction.connect(bidder1).claimRefund(bidId, bidder1Address)
       ).to.be.revertedWithCustomError(auction, "RefundAlreadyClaimed");
     });
 
     it("Should revert if a non-bidder tries to claim refund", async function () {
       const bidId = BigInt(0);
+      const ownerAddress = await owner.getAddress();
 
       await expect(
-        auction.connect(owner).claimRefund(bidId)
+        auction.connect(owner).claimRefund(bidId, ownerAddress)
       ).to.be.revertedWithCustomError(auction, "NotBidder");
     });
   });
+
+  describe("claimRefunds", function () {
+    let startTime: number;
+    let endTime: number;
+    beforeEach(async function () {
+      const currentBlock = await ethers.provider.getBlock("latest");
+      const currentTime = currentBlock?.timestamp ?? 0;
+
+      startTime = currentTime + 60; // Start auction after 1 minute
+      endTime = startTime + 3600; // End auction 1 hour after it starts
+      const minBid = ethers.parseEther("0.1");
+      const minBidDenomination = ethers.parseEther("0.01");
+
+      await auction.startAuction(
+        startTime,
+        endTime,
+        minBid,
+        minBidDenomination
+      );
+
+      // Fast forward to auction start time
+      await ethers.provider.send("evm_setNextBlockTimestamp", [startTime]);
+      await ethers.provider.send("evm_mine", []);
+
+      const bidAmount1 = ethers.parseEther("0.2");
+      const bidAmount2 = ethers.parseEther("0.3");
+
+      await auction.connect(bidder1).placeBid({ value: bidAmount1 });
+      await auction.connect(bidder1).placeBid({ value: bidAmount1 });
+      await auction.connect(bidder2).placeBid({ value: bidAmount2 });
+
+      // Fast forward to after auction end time
+      await ethers.provider.send("evm_setNextBlockTimestamp", [endTime + 1]);
+      await ethers.provider.send("evm_mine", []);
+
+      await auction.endAuction();
+
+      const winningBidIds = [BigInt(2)];
+      await auction.setWinners(winningBidIds);
+    });
+
+    it("Should allow a non-winning bidder to claim refund", async function () {
+      const bidIds = [BigInt(0), BigInt(1)];
+      const bidder1Address = await bidder1.getAddress();
+      const bidder1BalanceBefore =
+        await ethers.provider.getBalance(bidder1Address);
+
+      await expect(
+        auction.connect(bidder1).claimRefunds(bidIds, bidder1Address)
+      )
+        .to.emit(auction, "RefundClaimed")
+        .withArgs(bidder1Address, ethers.parseEther("0.2"));
+
+      const bidder1BalanceAfter =
+        await ethers.provider.getBalance(bidder1Address);
+      expect(bidder1BalanceAfter).to.be.gt(bidder1BalanceBefore);
+
+      const bidOne = await auction.getBid(bidIds[0]);
+      expect(bidOne.isClaimed).to.be.true;
+      const bidTwo = await auction.getBid(bidIds[1]);
+      expect(bidTwo.isClaimed).to.be.true;
+    });
+
+    it("Should revert if a winning bidder tries to claim refund", async function () {
+      const bidId = BigInt(2);
+      const bidder2Address = await bidder2.getAddress();
+
+      await expect(
+        auction.connect(bidder2).claimRefund(bidId, bidder2Address)
+      ).to.be.revertedWithCustomError(auction, "WinnerCannotClaimRefund");
+    });
+
+    it("Should revert if a bidder tries to claim refund twice", async function () {
+      const bidIds = [BigInt(0), BigInt(1)];
+      const bidder1Address = await bidder1.getAddress();
+
+      await auction.connect(bidder1).claimRefunds(bidIds, bidder1Address);
+
+      await expect(
+        auction.connect(bidder1).claimRefunds(bidIds, bidder1Address)
+      ).to.be.revertedWithCustomError(auction, "RefundAlreadyClaimed");
+    });
+
+    it("Should revert if a bidder tries to claim refund individually then all at once", async function () {
+      const bidIds = [BigInt(0), BigInt(1)];
+      const bidder1Address = await bidder1.getAddress();
+
+      await auction.connect(bidder1).claimRefund(bidIds[0], bidder1Address);
+
+      await expect(
+        auction.connect(bidder1).claimRefunds(bidIds, bidder1Address)
+      ).to.be.revertedWithCustomError(auction, "RefundAlreadyClaimed");
+    });
+
+    it("Should revert if a non-bidder tries to claim refunds", async function () {
+      const bidIds = [BigInt(0), BigInt(1)];
+      const ownerAddress = await owner.getAddress();
+
+      await expect(
+        auction.connect(owner).claimRefunds(bidIds, ownerAddress)
+      ).to.be.revertedWithCustomError(auction, "NotBidder");
+    });
+  });
+
   describe("withdrawWinningFunds", function () {
     let startTime: number;
     let endTime: number;
 
     beforeEach(async function () {
       const currentBlock = await ethers.provider.getBlock("latest");
-      const currentTime = currentBlock?.timestamp;
+      const currentTime = currentBlock?.timestamp ?? 0;
 
       startTime = currentTime + 60; // Start auction after 1 minute
       endTime = startTime + 3600; // End auction 1 hour after it starts

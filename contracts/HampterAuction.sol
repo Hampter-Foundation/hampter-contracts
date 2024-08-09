@@ -257,6 +257,27 @@ contract HampterAuction is Ownable, ReentrancyGuard {
         emit RefundClaimed(msg.sender, bid.amount);
     }
 
+    function claimRefunds(uint256[] calldata bidIds) external nonReentrant {
+        if (auction.auctionState != AuctionState.WinnersAnnounced) revert WinnersNotAnnounced();
+
+        for (uint256 i = 0; i < bidIds.length; i++) {
+            uint256 bidId = bidIds[i];
+            if (!validBidIds[bidId]) revert InvalidBidId();
+
+            uint256 bidIndex = bidIdToBidsIndex[bidId];
+            Bid storage bid = bids[bidIndex]; // Use storage to get a reference to the actual storage
+
+            if (bid.bidder != msg.sender) revert NotBidder(); // Check if the caller is the bidder
+            if (bid.isWinner) revert WinnerCannotClaimRefund();
+            if (bid.isClaimed) revert RefundAlreadyClaimed();
+
+            bid.isClaimed = true;
+            payable(msg.sender).transfer(bid.amount);
+
+            emit RefundClaimed(msg.sender, bid.amount);
+        }
+    }
+
     /// @dev Allows the owner to withdraw the winning funds after the auction has ended
     /// @param batchSize The number of bids to process in a single batch
     function withdrawWinningFunds(uint256 batchSize) external onlyOwner {

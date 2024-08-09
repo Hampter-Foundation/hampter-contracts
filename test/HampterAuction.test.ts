@@ -1,8 +1,6 @@
 import { expect } from "chai";
+import { Signer } from "ethers";
 import { ethers } from "hardhat";
-import { HampterNFT } from "../typechain-types/HampterAuction";
-import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
-import { Contract, Signer } from "ethers";
 import { HampterAuction } from "../typechain-types";
 
 // TODO: Try to break the code
@@ -104,7 +102,7 @@ describe("HampterAuction", function () {
   describe("endAuction", function () {
     beforeEach(async function () {
       const currentBlock = await ethers.provider.getBlock("latest");
-      const currentTime = currentBlock?.timestamp;
+      const currentTime = currentBlock?.timestamp ?? 0;
       const startTime = currentTime + 60; // Start auction after 1 minute
       const endTime = startTime + 3600; // End auction 1 hour after it starts
 
@@ -149,7 +147,7 @@ describe("HampterAuction", function () {
 
     beforeEach(async function () {
       const currentBlock = await ethers.provider.getBlock("latest");
-      const currentTime = currentBlock?.timestamp;
+      const currentTime = currentBlock?.timestamp ?? 0;
 
       startTime = currentTime + 60; // Start auction after 1 minute
       endTime = startTime + 3600; // End auction 1 hour after it starts
@@ -208,7 +206,7 @@ describe("HampterAuction", function () {
     let endTime: number;
     beforeEach(async function () {
       const currentBlock = await ethers.provider.getBlock("latest");
-      const currentTime = currentBlock?.timestamp;
+      const currentTime = currentBlock?.timestamp ?? 0;
 
       startTime = currentTime + 60; // Start auction after 1 minute
       endTime = startTime + 3600; // End auction 1 hour after it starts
@@ -390,7 +388,7 @@ describe("HampterAuction", function () {
 
     beforeEach(async function () {
       const currentBlock = await ethers.provider.getBlock("latest");
-      const currentTime = currentBlock?.timestamp;
+      const currentTime = currentBlock?.timestamp ?? 0;
 
       startTime = currentTime + 60; // Start auction after 1 minute
       endTime = startTime + 3600; // End auction 1 hour after it starts

@@ -2,7 +2,7 @@
 
 import { ethers } from "hardhat";
 import * as dotenv from "dotenv";
-import { NFTStaking } from "../../typechain-types";
+import { NFTStaking } from "../../../typechain-types";
 
 dotenv.config();
 

@@ -1,0 +1,43 @@
+{
+  "name": "CTZN #3",
+  "description": "8888 unique dystopian cyberpunks on Blast",
+  "image": "ipfs://QmSueCaytqYGDSv4MJHPM4qm26XrqH3tox29VKxnZeDfR8/3.png",
+  "dna": "6ab6a09422ac6c61b4e12b30e5fa3b7950d502d5",
+  "edition": 3,
+  "date": 1712024257043,
+  "attributes": [
+    {
+      "trait_type": "background",
+      "value": "windows xp"
+    },
+    {
+      "trait_type": "type",
+      "value": "grey stripe"
+    },
+    {
+      "trait_type": "body",
+      "value": "black chain"
+    },
+    {
+      "trait_type": "eyes",
+      "value": "blue frameless"
+    },
+    {
+      "trait_type": "hands",
+      "value": "thumbs up"
+    },
+    {
+      "trait_type": "head",
+      "value": "black paintooor"
+    },
+    {
+      "trait_type": "mouth",
+      "value": "upset"
+    },
+    {
+      "trait_type": "nose",
+      "value": "pointy"
+    }
+  ],
+  "compiler": "HashLips Art Engine"
+}

@@ -1,0 +1,43 @@
+{
+  "name": "CTZN #2",
+  "description": "8888 unique dystopian cyberpunks on Blast",
+  "image": "ipfs://QmSueCaytqYGDSv4MJHPM4qm26XrqH3tox29VKxnZeDfR8/2.png",
+  "dna": "3f6eb7836d0d68ededeb2094edf6dc15a8258c9c",
+  "edition": 2,
+  "date": 1712024256729,
+  "attributes": [
+    {
+      "trait_type": "background",
+      "value": "forest"
+    },
+    {
+      "trait_type": "type",
+      "value": "orange patches"
+    },
+    {
+      "trait_type": "body",
+      "value": "horse"
+    },
+    {
+      "trait_type": "eyes",
+      "value": "bored"
+    },
+    {
+      "trait_type": "hands",
+      "value": "yellow cool s"
+    },
+    {
+      "trait_type": "head",
+      "value": "chef"
+    },
+    {
+      "trait_type": "mouth",
+      "value": "normal"
+    },
+    {
+      "trait_type": "nose",
+      "value": "oval"
+    }
+  ],
+  "compiler": "HashLips Art Engine"
+}

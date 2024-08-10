@@ -1,0 +1,43 @@
+{
+  "name": "CTZN #4",
+  "description": "8888 unique dystopian cyberpunks on Blast",
+  "image": "ipfs://QmSueCaytqYGDSv4MJHPM4qm26XrqH3tox29VKxnZeDfR8/4.png",
+  "dna": "cdb4dd805bacb1aebc7b2865b5df85d53647e571",
+  "edition": 4,
+  "date": 1712024257423,
+  "attributes": [
+    {
+      "trait_type": "background",
+      "value": "under the sea"
+    },
+    {
+      "trait_type": "type",
+      "value": "grey stripe"
+    },
+    {
+      "trait_type": "body",
+      "value": "ketamine tee"
+    },
+    {
+      "trait_type": "eyes",
+      "value": "hehe"
+    },
+    {
+      "trait_type": "hands",
+      "value": "corn kernel"
+    },
+    {
+      "trait_type": "head",
+      "value": "sailor"
+    },
+    {
+      "trait_type": "mouth",
+      "value": "smoking"
+    },
+    {
+      "trait_type": "nose",
+      "value": "oval"
+    }
+  ],
+  "compiler": "HashLips Art Engine"
+}

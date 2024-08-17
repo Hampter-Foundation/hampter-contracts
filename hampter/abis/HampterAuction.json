@@ -1,0 +1,331 @@
+[
+  { "inputs": [], "stateMutability": "nonpayable", "type": "constructor" },
+  { "inputs": [], "name": "AuctionAlreadyEnded", "type": "error" },
+  { "inputs": [], "name": "AuctionAlreadyStarted", "type": "error" },
+  { "inputs": [], "name": "AuctionNotEnded", "type": "error" },
+  { "inputs": [], "name": "AuctionNotOngoing", "type": "error" },
+  { "inputs": [], "name": "AuctionNotStarted", "type": "error" },
+  { "inputs": [], "name": "BidAmountNotMultiple", "type": "error" },
+  { "inputs": [], "name": "BidAmountTooLow", "type": "error" },
+  { "inputs": [], "name": "BidLimitReached", "type": "error" },
+  { "inputs": [], "name": "EndTimeInPast", "type": "error" },
+  { "inputs": [], "name": "InvalidBidId", "type": "error" },
+  { "inputs": [], "name": "InvalidStartEndTime", "type": "error" },
+  { "inputs": [], "name": "MinBidTooLow", "type": "error" },
+  { "inputs": [], "name": "NoRemainingFunds", "type": "error" },
+  { "inputs": [], "name": "NoWinningFunds", "type": "error" },
+  { "inputs": [], "name": "NotBidder", "type": "error" },
+  {
+    "inputs": [
+      { "internalType": "address", "name": "owner", "type": "address" }
+    ],
+    "name": "OwnableInvalidOwner",
+    "type": "error"
+  },
+  {
+    "inputs": [
+      { "internalType": "address", "name": "account", "type": "address" }
+    ],
+    "name": "OwnableUnauthorizedAccount",
+    "type": "error"
+  },
+  { "inputs": [], "name": "ReentrancyGuardReentrantCall", "type": "error" },
+  { "inputs": [], "name": "RefundAlreadyClaimed", "type": "error" },
+  { "inputs": [], "name": "TooEarlyForRemainingFunds", "type": "error" },
+  { "inputs": [], "name": "WinnerCannotClaimRefund", "type": "error" },
+  { "inputs": [], "name": "WinnersNotAnnounced", "type": "error" },
+  { "inputs": [], "name": "WinningBidsEmpty", "type": "error" },
+  { "anonymous": false, "inputs": [], "name": "AuctionEnded", "type": "event" },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "bidder",
+        "type": "address"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "amount",
+        "type": "uint256"
+      }
+    ],
+    "name": "BidPlaced",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "owner",
+        "type": "address"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "amount",
+        "type": "uint256"
+      }
+    ],
+    "name": "FundsWithdrawn",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "previousOwner",
+        "type": "address"
+      },
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "newOwner",
+        "type": "address"
+      }
+    ],
+    "name": "OwnershipTransferred",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "bidder",
+        "type": "address"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "amount",
+        "type": "uint256"
+      }
+    ],
+    "name": "RefundClaimed",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": false,
+        "internalType": "uint256[]",
+        "name": "winningBids",
+        "type": "uint256[]"
+      }
+    ],
+    "name": "WinnersAnnounced",
+    "type": "event"
+  },
+  {
+    "inputs": [],
+    "name": "auction",
+    "outputs": [
+      { "internalType": "uint256", "name": "startTime", "type": "uint256" },
+      { "internalType": "uint256", "name": "endTime", "type": "uint256" },
+      { "internalType": "uint256", "name": "minBid", "type": "uint256" },
+      {
+        "internalType": "uint256",
+        "name": "bidDenomination",
+        "type": "uint256"
+      },
+      {
+        "internalType": "enum HampterAuction.AuctionState",
+        "name": "auctionState",
+        "type": "uint8"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [{ "internalType": "uint256", "name": "", "type": "uint256" }],
+    "name": "bidIdToBidsIndex",
+    "outputs": [{ "internalType": "uint256", "name": "", "type": "uint256" }],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      { "internalType": "address", "name": "", "type": "address" },
+      { "internalType": "uint256", "name": "", "type": "uint256" }
+    ],
+    "name": "bidderToBidIds",
+    "outputs": [{ "internalType": "uint256", "name": "", "type": "uint256" }],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [{ "internalType": "uint256", "name": "", "type": "uint256" }],
+    "name": "bids",
+    "outputs": [
+      { "internalType": "address", "name": "bidder", "type": "address" },
+      { "internalType": "uint256", "name": "amount", "type": "uint256" },
+      { "internalType": "uint256", "name": "bidId", "type": "uint256" },
+      { "internalType": "bool", "name": "isWinner", "type": "bool" },
+      { "internalType": "bool", "name": "isClaimed", "type": "bool" },
+      { "internalType": "uint256", "name": "timestamp", "type": "uint256" }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      { "internalType": "uint256", "name": "bidId", "type": "uint256" }
+    ],
+    "name": "claimRefund",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "endAuction",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      { "internalType": "uint256", "name": "bidId", "type": "uint256" }
+    ],
+    "name": "getBid",
+    "outputs": [
+      {
+        "components": [
+          { "internalType": "address", "name": "bidder", "type": "address" },
+          { "internalType": "uint256", "name": "amount", "type": "uint256" },
+          { "internalType": "uint256", "name": "bidId", "type": "uint256" },
+          { "internalType": "bool", "name": "isWinner", "type": "bool" },
+          { "internalType": "bool", "name": "isClaimed", "type": "bool" },
+          { "internalType": "uint256", "name": "timestamp", "type": "uint256" }
+        ],
+        "internalType": "struct HampterAuction.Bid",
+        "name": "",
+        "type": "tuple"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      { "internalType": "address", "name": "bidder", "type": "address" }
+    ],
+    "name": "getBidCount",
+    "outputs": [{ "internalType": "uint256", "name": "", "type": "uint256" }],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "maxBidPerAddress",
+    "outputs": [{ "internalType": "uint32", "name": "", "type": "uint32" }],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "nextBidId",
+    "outputs": [{ "internalType": "uint256", "name": "", "type": "uint256" }],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "owner",
+    "outputs": [{ "internalType": "address", "name": "", "type": "address" }],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "placeBid",
+    "outputs": [],
+    "stateMutability": "payable",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "renounceOwnership",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "resetAuction",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256[]",
+        "name": "_winningBidIds",
+        "type": "uint256[]"
+      }
+    ],
+    "name": "setWinners",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      { "internalType": "uint256", "name": "_startTime", "type": "uint256" },
+      { "internalType": "uint256", "name": "_endTime", "type": "uint256" },
+      { "internalType": "uint256", "name": "_minBid", "type": "uint256" },
+      {
+        "internalType": "uint256",
+        "name": "_minBidIncrement",
+        "type": "uint256"
+      }
+    ],
+    "name": "startAuction",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      { "internalType": "address", "name": "newOwner", "type": "address" }
+    ],
+    "name": "transferOwnership",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [{ "internalType": "uint256", "name": "", "type": "uint256" }],
+    "name": "validBidIds",
+    "outputs": [{ "internalType": "bool", "name": "", "type": "bool" }],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "withdrawRemainingFunds",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      { "internalType": "uint256", "name": "batchSize", "type": "uint256" }
+    ],
+    "name": "withdrawWinningFunds",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  }
+]

@@ -1,0 +1,8 @@
+{
+  "sepolia": {
+    "HampterAuction": {
+      "address": "0x1EC3d865CE8dddA9D40D951E4B330323566C8B7E",
+      "startBlock": 6334809
+    }
+  }
+}
